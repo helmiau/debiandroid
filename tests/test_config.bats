@@ -1,10 +1,17 @@
 #!/usr/bin/env bats
 # SPDX-License-Identifier: MIT
-# Config and preflight behaviour. Run: bats tests/
+# Config, preflight, and dry-run behaviour. Run: bats tests/
 setup() {
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
   export DEBIANDROID_OUT="$BATS_TEST_TMPDIR/out"
   export DEBIANDROID_CACHE="$BATS_TEST_TMPDIR/cache"
+  export FASTBOOT_BIN=true
+  mkdir -p "$BATS_TEST_TMPDIR/repo"
+  cp -r "$REPO_ROOT/devices" "$BATS_TEST_TMPDIR/repo/"
+  for d in santoni mido sagit; do
+    cp "$REPO_ROOT/devices/$d.env.example" "$BATS_TEST_TMPDIR/repo/devices/$d.env"
+  done
+  export DEBIANDROID_REPO_ROOT="$BATS_TEST_TMPDIR/repo"
 }
 
 @test "every codename has an example env" {
@@ -13,11 +20,16 @@ setup() {
   done
 }
 
-@test "example env declares DEVICE matching its filename" {
+@test "example env DEVICE matches its filename" {
   for dev in santoni mido sagit; do
     run grep -x "DEVICE=$dev" "$REPO_ROOT/devices/$dev.env.example"
     [ "$status" -eq 0 ]
   done
+}
+
+@test "santoni pins a 40-character commit" {
+  run grep -E '^KERNEL_COMMIT=[0-9a-f]{40}$' "$REPO_ROOT/devices/santoni.env.example"
+  [ "$status" -eq 0 ]
 }
 
 @test "santoni uses eMMC page size 2048" {
@@ -30,18 +42,32 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "CMDLINE is quoted" {
+  for dev in santoni mido sagit; do
+    run grep -E '^CMDLINE=".+"$' "$REPO_ROOT/devices/$dev.env.example"
+    [ "$status" -eq 0 ]
+  done
+}
+
 @test "preflight rejects an unknown codename with exit 2" {
   run "$REPO_ROOT/scripts/lib/preflight.sh" nosuchdevice
   [ "$status" -eq 2 ]
   [[ "$output" == *"unknown codename"* ]]
 }
 
-@test "preflight passes for a valid codename in dry-run" {
-  cp "$REPO_ROOT/devices/santoni.env.example" "$BATS_TEST_TMPDIR/santoni.env"
-  mkdir -p "$BATS_TEST_TMPDIR/devices"
-  cp "$BATS_TEST_TMPDIR/santoni.env" "$BATS_TEST_TMPDIR/devices/santoni.env"
-  run bash -c "cd '$BATS_TEST_TMPDIR' && '$REPO_ROOT/scripts/lib/preflight.sh' santoni --dry-run"
-  [ "$status" -eq 0 ]
+@test "preflight passes for every codename in dry-run" {
+  for dev in santoni mido sagit; do
+    run env DEBIANDROID_ROOT_OVERRIDE=1 "$REPO_ROOT/scripts/lib/preflight.sh" "$dev" --dry-run
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "preflight fails on a malformed commit pin" {
+  sed -i 's/^KERNEL_COMMIT=.*/KERNEL_COMMIT=zzz/' "$DEBIANDROID_REPO_ROOT/devices/santoni.env"
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" \
+      "$REPO_ROOT/scripts/lib/preflight.sh" santoni --dry-run
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"KERNEL_COMMIT"* ]]
 }
 
 @test "partition guard refuses a non-block target" {
@@ -50,12 +76,17 @@ setup() {
   [[ "$output" == *"refusing non-block-device"* ]]
 }
 
-@test "flash dry-run needs no device" {
+@test "flash dry-run succeeds without a device" {
   mkdir -p "$DEBIANDROID_OUT/santoni"
   touch "$DEBIANDROID_OUT/santoni/boot-santoni.img"
-  cp "$REPO_ROOT/devices/santoni.env.example" "$REPO_ROOT/devices/__tmp_santoni.env"
-  run env FASTBOOT_BIN=true "$REPO_ROOT/scripts/flash.sh" santoni --ram-boot --dry-run
-  status_saved=$status
-  rm -f "$REPO_ROOT/devices/__tmp_santoni.env"
-  [ "$status_saved" -eq 0 ]
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" \
+      "$REPO_ROOT/scripts/flash.sh" santoni --ram-boot --dry-run
+  [ "$status" -eq 0 ]
+}
+
+@test "flash dry-run fails clearly when the image is missing" {
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" \
+      "$REPO_ROOT/scripts/flash.sh" santoni --ram-boot --dry-run
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"boot image not built"* ]]
 }

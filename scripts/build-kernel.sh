@@ -31,14 +31,14 @@ fi
 run git -C "$SRC" fetch --all --tags --quiet
 run git -C "$SRC" checkout --quiet "$KERNEL_REF"
 head_sha="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || echo unknown)"
-if [ -n "${KERNEL_SHA256:-}" ]; then
-  [ "${#KERNEL_SHA256}" -eq 40 ] || warn "KERNEL_SHA256 is not a 40-character commit id"
-  if [ "$head_sha" != "$KERNEL_SHA256" ]; then
-    die "source pin mismatch: HEAD=$head_sha expected=$KERNEL_SHA256"
+if [ -n "${KERNEL_COMMIT:-}" ]; then
+  [ "${#KERNEL_COMMIT}" -eq 40 ] || warn "KERNEL_COMMIT is not a 40-character commit id"
+  if [ "$head_sha" != "$KERNEL_COMMIT" ]; then
+    die "source pin mismatch: HEAD=$head_sha expected=$KERNEL_COMMIT"
   fi
   info "source pin OK: $head_sha"
 else
-  warn "KERNEL_SHA256 unset: building an unpinned checkout $head_sha"
+  warn "KERNEL_COMMIT unset: building an unpinned checkout $head_sha"
 fi
 [ "$CHECK_ONLY" = "1" ] && { info "check-only complete"; exit 0; }
 

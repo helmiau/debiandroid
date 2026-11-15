@@ -3,12 +3,16 @@
 # Shared helpers. Source this file; do not execute it.
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT_DIR="${DEBIANDROID_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 OUT_DIR="${DEBIANDROID_OUT:-$ROOT_DIR/out}"
 CACHE_DIR="${DEBIANDROID_CACHE:-$ROOT_DIR/.cache}"
 FASTBOOT_BIN="${FASTBOOT_BIN:-fastboot}"
 
 DRY_RUN=0
+for _arg in "$@"; do
+  [ "$_arg" = "--dry-run" ] && DRY_RUN=1
+done
+unset _arg
 COLOR_RESET=''; COLOR_RED=''; COLOR_YELLOW=''; COLOR_GREEN=''
 if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ]; then
   COLOR_RESET=$'\033[0m'; COLOR_RED=$'\033[31m'; COLOR_YELLOW=$'\033[33m'; COLOR_GREEN=$'\033[32m'
@@ -63,7 +67,7 @@ load_device() {
   case "$BOOTIMG_PAGESIZE" in 2048|4096) ;; *) die "$file: BOOTIMG_PAGESIZE must be 2048 or 4096" ;; esac
   case "$NET_MODE" in wlan0|usb0|eth0) ;; *) die "$file: NET_MODE must be wlan0, usb0, or eth0" ;; esac
   [ "${MIN_FREE_GB:-0}" -ge 1 ] 2>/dev/null || die "$file: MIN_FREE_GB must be a positive integer"
-  export DEVICE SOC KERNEL_REPO KERNEL_REF KERNEL_SHA256 DEFCONFIG DTB_NAME DTB_VARIANT \
+  export DEVICE SOC KERNEL_REPO KERNEL_REF KERNEL_COMMIT KERNEL_ARCHIVE_SHA256 DEFCONFIG DTB_NAME DTB_VARIANT \
          BOOTIMG_PAGESIZE BOOTIMG_BASE CMDLINE NET_MODE ROOT_PARTNAME_EXPECTED ROOT_MARKER MIN_FREE_GB
 }
 

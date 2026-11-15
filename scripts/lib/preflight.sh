@@ -24,11 +24,18 @@ fail=0
 note() { [ "$1" = "fail" ] && fail=1; printf '%-6s %s\n' "${1^^}" "$2" >&2; }
 
 # 1. Configuration sanity.
-if [ -n "${KERNEL_SHA256:-}" ]; then
-  case "$KERNEL_SHA256" in *[!0-9a-fA-F]*|"") note fail "KERNEL_SHA256 is not hex";; esac
-  [ "${#KERNEL_SHA256}" -eq 64 ] || note fail "KERNEL_SHA256 must be 64 hex characters"
+if [ -n "${KERNEL_COMMIT:-}" ]; then
+  case "$KERNEL_COMMIT" in *[!0-9a-f]*) note fail "KERNEL_COMMIT is not lowercase hex";; esac
+  [ "${#KERNEL_COMMIT}" -eq 40 ] || note fail "KERNEL_COMMIT must be 40 hex characters"
+  note ok "kernel pinned to $KERNEL_COMMIT"
 else
-  note warn "KERNEL_SHA256 empty: source pinning disabled until set"
+  note warn "KERNEL_COMMIT empty: build will not be reproducible"
+fi
+if [ -n "${KERNEL_ARCHIVE_SHA256:-}" ]; then
+  case "$KERNEL_ARCHIVE_SHA256" in *[!0-9a-fA-F]*|"") note fail "KERNEL_ARCHIVE_SHA256 is not hex";; esac
+  [ "${#KERNEL_ARCHIVE_SHA256}" -eq 64 ] || note fail "KERNEL_ARCHIVE_SHA256 must be 64 hex characters"
+else
+  note warn "KERNEL_ARCHIVE_SHA256 empty: archive checksum not enforced"
 fi
 case "$DTB_NAME" in *.dtb) ;; *) note fail "DTB_NAME must end in .dtb";; esac
 note ok "config $DEVICE ($SOC) loaded"

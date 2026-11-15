@@ -28,7 +28,7 @@ Implication: no EFI stub, GRUB, or new firmware is required. A valid `boot.img` 
 4. Store artifacts in `out/<codename>/` together with checksums.
 
 **Sources used**
-- santoni: MSM8937 has early mainline support (Redmi 3S upstreamed 2025) plus community trees; treat this as the least mature target.
+- santoni: `MrArtemSid/linux-msm89x7` branch `santoni`, pinned to `f47205ee`. Provides `msm8940-xiaomi-santoni.dts` and `santoni_openwrt_defconfig`. MSM8940 is the Redmi 4X variant of MSM8937. Out-of-tree panel drivers exist in `drm/panel/msm89x7-generated/` (`panel-xiaomi-santoni-hx8394f-boe`, `-ili9881c-ebbg`, `-ili9881c-ebbgdjn`); identify your panel before enabling one.
 - sagit: the MSM8998 community fork that explicitly supports the Xiaomi Mi6.
 - mido: mainline MSM8953 (base DT since 5.18) or the postmarketOS `qcom-msm8953` kernel as a ready reference.
 
@@ -146,7 +146,7 @@ findmnt / && ip -br a && systemctl status ssh
 
 Two guards adopted from a comparable hardware bring-up project (Xiaomi Mi 11 Pro native UEFI port). Neither depends on UEFI.
 
-**Source pinning.** `devices/<codename>.env` records `KERNEL_REPO`, `KERNEL_REF`, and `KERNEL_SHA256`. `scripts/build-kernel.sh` verifies the checked-out commit and the source checksum before compiling and aborts on mismatch. This keeps builds reproducible across machines and months.
+**Source pinning.** `devices/<codename>.env` records `KERNEL_REPO`, `KERNEL_REF`, `KERNEL_COMMIT` (40-hex pin) and `KERNEL_ARCHIVE_SHA256` (optional tarball checksum). `scripts/lib/kernel-pin.sh` checks the pin against the remote without cloning; `scripts/build-kernel.sh` then compares `HEAD` to `KERNEL_COMMIT` and aborts on mismatch. This keeps builds reproducible across machines and months.
 
 **Partition identity guard.** Before any `mount` or `mkfs`, the installer confirms:
 

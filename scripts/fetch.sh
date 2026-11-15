@@ -9,7 +9,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/common.sh"
 
 BACKEND=""; CHANNEL="stable"; TAG=""; REPO="${DEBIANDROID_REPO:-helmiau/debiandroid}"; VERIFY=1
-for a in "$@"; do [ "$a" = "--dry-run" ] && DRY_RUN=1; done
 for arg in "$@"; do
   case "$arg" in
     --backend=*) BACKEND="${arg#*=}" ;;

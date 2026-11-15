@@ -56,3 +56,18 @@ Record device, firmware, panel variant, commit, and image hash for each run.
 ## Reporting
 
 File hardware results with the issue template. Redact identifiers. Attach the image hash and the exact commands used.
+
+## P1 validation run (2026-11-16)
+
+| Check | Command | Result |
+|---|---|---|
+| Syntax, all scripts | `bash -n scripts/**/*.sh` | PASS |
+| bats suite | `bats tests/test_config.bats` | PASS 12/12 |
+| Preflight, 3 codenames | `preflight.sh <dev> --dry-run` | PASS |
+| Fetch dry-run | `fetch.sh --backend debian --channel stable --tag v0.1.0 --dry-run` | PASS, no network |
+| Flash dry-run | `flash.sh santoni --ram-boot --dry-run` | PASS |
+| Guard negative | `partition-guard.sh /tmp/x userdata /etc/y --dry-run` | PASS (exit 3) |
+| Kernel pin vs remote | `kernel-pin.sh santoni` | PASS (matches branch head) |
+| shellcheck | not installed on the authoring host | NOT RUN |
+
+Not validated: any on-device boot. The santoni handset was not connected during P2.
