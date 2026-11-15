@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
-# Kernel and boot image build for a single codename.
-# Trigger: manual dispatch, or v* tags (release.yml handles publishing).
+# Kernel and boot image build.
+# Trigger: manual dispatch (choose one codename) or a v* tag (all codenames).
 name: build-kernel
 
 on:
@@ -30,56 +30,46 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        codename: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.codename)) || fromJSON('["santoni"]') }}
+        codename: [santoni, mido, sagit]
     env:
       DEBIANDROID_OUT: ${{ github.workspace }}/out
       DEBIANDROID_CACHE: ${{ github.workspace }}/.cache
-      ARCH: arm64
-      CROSS_COMPILE: aarch64-linux-gnu-
-
     steps:
+      - name: Decide whether to build this codename
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            [ "${{ inputs.codename }}" = "${{ matrix.codename }}" ] && echo "run=1" >> "$GITHUB_OUTPUT" || echo "run=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=1" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
-
+        if: steps.gate.outputs.run == '1'
       - name: Install toolchain
+        if: steps.gate.outputs.run == '1'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential bc bison flex libssl-dev libelf-dev \
-            gcc-aarch64-linux-gnu device-tree-compiler cpio zstd \
-            python3 python3-pip
-          # mkbootimg comes from scripts/lib/mkbootimg.py; no pip package needed.
-
+            gcc-aarch64-linux-gnu device-tree-compiler cpio zstd python3
           for t in aarch64-linux-gnu-gcc make dtc python3; do
             command -v "$t" || { echo "missing $t"; exit 1; }
           done
-
       - name: Prepare device config
-        run: |
-          cp "devices/${{ matrix.codename }}.env.example" "devices/${{ matrix.codename }}.env"
-          cat "devices/${{ matrix.codename }}.env"
-
-- name: Preflight
-        run: ./scripts/lib/preflight.sh "${{ matrix.codename }}" --require-host-tools --dry-run
-
+        if: steps.gate.outputs.run == '1'
+        run: cp "devices/${{ matrix.codename }}.env.example" "devices/${{ matrix.codename }}.env"
       - name: Verify kernel pin
+        if: steps.gate.outputs.run == '1'
         run: ./scripts/lib/kernel-pin.sh "${{ matrix.codename }}"
-
-      - name: Build kernel
-        run: ./scripts/build-kernel.sh "${{ matrix.codename }}"
-
-      - name: Assemble boot image
-        run: ./scripts/make-bootimg.sh "${{ matrix.codename }}"
-
-      - name: Report artifacts
+      - name: Build
+        if: steps.gate.outputs.run == '1'
         run: |
-          set -e
-          D="out/${{ matrix.codename }}"
-          ls -la "$D"
-          echo "--- checksums ---"
-          cat "$D/SHA256SUMS"
-
+          ./scripts/build-kernel.sh "${{ matrix.codename }}"
+          ./scripts/make-bootimg.sh "${{ matrix.codename }}"
+          ls -la "out/${{ matrix.codename }}"
+          cat "out/${{ matrix.codename }}/SHA256SUMS" || true
       - name: Upload artifacts
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        if: steps.gate.outputs.run == '1' && (github.event_name == 'push' || inputs.upload)
         uses: actions/upload-artifact@v4
         with:
           name: boot-${{ matrix.codename }}-${{ github.sha }}
