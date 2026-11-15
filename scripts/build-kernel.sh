@@ -72,7 +72,15 @@ if [ "$DRY_RUN" = "1" ]; then
 fi
 make -C "$SRC" O="$KDIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
   -j"$(nproc 2>/dev/null || echo 4)" Image dtbs 2>&1 | tee "$LOG"
-[ -f "$KDIR/arch/arm64/boot/Image.gz" ] || die "kernel build produced no Image.gz, see $LOG"
+# Some trees emit only Image. Compress it when Image.gz is absent.
+if [ ! -f "$KDIR/arch/arm64/boot/Image.gz" ]; then
+  if [ -f "$KDIR/arch/arm64/boot/Image" ]; then
+    info "Image.gz absent; compressing Image with gzip -9"
+    gzip -9 -c "$KDIR/arch/arm64/boot/Image" > "$KDIR/arch/arm64/boot/Image.gz"
+  else
+    die "kernel build produced neither Image nor Image.gz, see $LOG"
+  fi
+fi
 
 # 4. Device tree.
 DTB="$KDIR/arch/arm64/boot/dts/$DTB_NAME"
