@@ -42,7 +42,7 @@ note ok "config $DEVICE ($SOC) loaded"
 
 # 2. Host tool availability (build-side only).
 if [ "$REQUIRE_TOOLS" = "1" ]; then
-  for tool in git make aarch64-linux-gnu-gcc mkbootimg; do
+  for tool in git make aarch64-linux-gnu-gcc python3 dtc; do
     if command -v "$tool" >/dev/null 2>&1; then note ok "host tool $tool"; else note fail "missing host tool $tool"; fi
   done
 fi

@@ -47,9 +47,9 @@ jobs:
             build-essential bc bison flex libssl-dev libelf-dev \
             gcc-aarch64-linux-gnu device-tree-compiler cpio zstd \
             python3 python3-pip
-          python3 -m pip install --quiet --break-system-packages \
-            mkbootimg==0.4.2 || python3 -m pip install --quiet --break-system-packages mkbootimg
-          for t in aarch64-linux-gnu-gcc make dtc mkbootimg; do
+          # mkbootimg comes from scripts/lib/mkbootimg.py; no pip package needed.
+
+          for t in aarch64-linux-gnu-gcc make dtc python3; do
             command -v "$t" || { echo "missing $t"; exit 1; }
           done
 
@@ -58,7 +58,7 @@ jobs:
           cp "devices/${{ matrix.codename }}.env.example" "devices/${{ matrix.codename }}.env"
           cat "devices/${{ matrix.codename }}.env"
 
-      - name: Preflight
+- name: Preflight
         run: ./scripts/lib/preflight.sh "${{ matrix.codename }}" --require-host-tools --dry-run
 
       - name: Verify kernel pin

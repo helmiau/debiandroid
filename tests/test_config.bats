@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Config, preflight, and dry-run behaviour. Run: bats tests/
 setup() {
+  PY="${PYTHON:-python3}"
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
   export DEBIANDROID_OUT="$BATS_TEST_TMPDIR/out"
   export DEBIANDROID_CACHE="$BATS_TEST_TMPDIR/cache"
@@ -108,4 +109,31 @@ setup() {
   run "$REPO_ROOT/scripts/build-kernel.sh" santoni --dry-run
   [ "$status" -ne 0 ]
   [[ "$output" == *"would verify HEAD"* ]]
+}
+
+@test "mkbootimg.py writes a valid v0 header with the right page size" {
+  local tmp="$BATS_TEST_TMPDIR/mk1"; mkdir -p "$tmp"
+  local wtmp; wtmp="$(cd "$tmp" && pwd -W 2>/dev/null || echo "$tmp")"
+  "$PY" -c "open(r'$wtmp/k.gz','wb').write(bytes(4096))"
+  run "$PY" "$REPO_ROOT/scripts/lib/mkbootimg.py" --kernel "$wtmp/k.gz" \
+      --pagesize 2048 --cmdline "console=ttyMSM0" --board santoni --output "$wtmp/b.img"
+  [ "$status" -eq 0 ]
+  run "$PY" -c "
+import struct,sys
+d=open(r'$wtmp/b.img','rb').read()
+assert d[:8]==b'ANDROID!'
+f=struct.unpack('<10I',d[8:48])
+assert f[7]==2048, f[7]
+assert len(d)%2048==0
+"
+  [ "$status" -eq 0 ]
+}
+
+@test "mkbootimg.py rejects a cmdline longer than header v0 allows" {
+  local tmp="$BATS_TEST_TMPDIR/mk2"; mkdir -p "$tmp"
+  local wtmp; wtmp="$(cd "$tmp" && pwd -W 2>/dev/null || echo "$tmp")"
+  "$PY" -c "open(r'$wtmp/k.gz','wb').write(bytes(16))"
+  long=$("$PY" -c "print('a'*600)")
+  run "$PY" "$REPO_ROOT/scripts/lib/mkbootimg.py" --kernel "$wtmp/k.gz" --cmdline "$long" --output "$wtmp/b.img"
+  [ "$status" -eq 2 ]
 }
