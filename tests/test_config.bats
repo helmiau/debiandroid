@@ -90,3 +90,22 @@ setup() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"boot image not built"* ]]
 }
+
+@test "santoni declares a kconfig fragment that exists" {
+  run grep -E '^KCONFIG_FRAGMENT=kernel/config/santoni-server.config$' "$REPO_ROOT/devices/santoni.env.example"
+  [ "$status" -eq 0 ]
+  [ -f "$REPO_ROOT/kernel/config/santoni-server.config" ]
+}
+
+@test "server fragment enables the USB gadget stack" {
+  for opt in CONFIG_USB_CONFIGFS CONFIG_USB_CONFIGFS_NCM CONFIG_BLK_DEV_LOOP CONFIG_EXT4_FS; do
+    run grep -x "$opt=y" "$REPO_ROOT/kernel/config/santoni-server.config"
+    [ "$status" -eq 0 ]
+  done
+}
+
+@test "build-kernel dry-run reports the pin before failing on host tools" {
+  run "$REPO_ROOT/scripts/build-kernel.sh" santoni --dry-run
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"would verify HEAD"* ]]
+}

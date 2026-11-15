@@ -30,10 +30,15 @@ if [ ! -d "$SRC/.git" ]; then
 fi
 run git -C "$SRC" fetch --all --tags --quiet
 run git -C "$SRC" checkout --quiet "$KERNEL_REF"
-head_sha="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || echo unknown)"
+if [ "$DRY_RUN" = "1" ] && [ ! -d "$SRC/.git" ]; then
+  log "[dry-run] would verify HEAD == $KERNEL_COMMIT"
+  head_sha="<dry-run>"
+else
+  head_sha="$(git -C "$SRC" rev-parse HEAD 2>/dev/null || echo unknown)"
+fi
 if [ -n "${KERNEL_COMMIT:-}" ]; then
   [ "${#KERNEL_COMMIT}" -eq 40 ] || warn "KERNEL_COMMIT is not a 40-character commit id"
-  if [ "$head_sha" != "$KERNEL_COMMIT" ]; then
+  if [ "$head_sha" != "$KERNEL_COMMIT" ] && [ "$head_sha" != "<dry-run>" ]; then
     die "source pin mismatch: HEAD=$head_sha expected=$KERNEL_COMMIT"
   fi
   info "source pin OK: $head_sha"
@@ -47,6 +52,16 @@ require_cmd make aarch64-linux-gnu-gcc
 
 # 2. Configure.
 run cp "$SRC/arch/arm64/configs/$DEFCONFIG" "$KDIR/.config"
+if [ -n "${KCONFIG_FRAGMENT:-}" ]; then
+  FRAG="$ROOT_DIR/$KCONFIG_FRAGMENT"
+  [ -f "$FRAG" ] || die "KCONFIG_FRAGMENT not found: $FRAG"
+  if [ "$DRY_RUN" = "1" ]; then
+    log "[dry-run] scripts/kconfig/merge_config.sh -m $KDIR/.config $FRAG"
+  else
+    "$SRC/scripts/kconfig/merge_config.sh" -m -O "$KDIR" "$KDIR/.config" "$FRAG" >/dev/null
+    info "merged fragment $KCONFIG_FRAGMENT"
+  fi
+fi
 run make -C "$SRC" O="$KDIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
 
 # 3. Compile.

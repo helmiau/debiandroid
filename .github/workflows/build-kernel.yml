@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: MIT
+# Kernel and boot image build for a single codename.
+# Trigger: manual dispatch, or v* tags (release.yml handles publishing).
+name: build-kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      codename:
+        description: 'Device codename'
+        required: true
+        default: santoni
+        type: choice
+        options: [santoni, mido, sagit]
+      upload:
+        description: 'Upload artifacts'
+        required: false
+        default: true
+        type: boolean
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        codename: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs.codename)) || fromJSON('["santoni"]') }}
+    env:
+      DEBIANDROID_OUT: ${{ github.workspace }}/out
+      DEBIANDROID_CACHE: ${{ github.workspace }}/.cache
+      ARCH: arm64
+      CROSS_COMPILE: aarch64-linux-gnu-
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc bison flex libssl-dev libelf-dev \
+            gcc-aarch64-linux-gnu device-tree-compiler cpio zstd \
+            python3 python3-pip
+          python3 -m pip install --quiet --break-system-packages \
+            mkbootimg==0.4.2 || python3 -m pip install --quiet --break-system-packages mkbootimg
+          for t in aarch64-linux-gnu-gcc make dtc mkbootimg; do
+            command -v "$t" || { echo "missing $t"; exit 1; }
+          done
+
+      - name: Prepare device config
+        run: |
+          cp "devices/${{ matrix.codename }}.env.example" "devices/${{ matrix.codename }}.env"
+          cat "devices/${{ matrix.codename }}.env"
+
+      - name: Preflight
+        run: ./scripts/lib/preflight.sh "${{ matrix.codename }}" --require-host-tools --dry-run
+
+      - name: Verify kernel pin
+        run: ./scripts/lib/kernel-pin.sh "${{ matrix.codename }}"
+
+      - name: Build kernel
+        run: ./scripts/build-kernel.sh "${{ matrix.codename }}"
+
+      - name: Assemble boot image
+        run: ./scripts/make-bootimg.sh "${{ matrix.codename }}"
+
+      - name: Report artifacts
+        run: |
+          set -e
+          D="out/${{ matrix.codename }}"
+          ls -la "$D"
+          echo "--- checksums ---"
+          cat "$D/SHA256SUMS"
+
+      - name: Upload artifacts
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-${{ matrix.codename }}-${{ github.sha }}
+          path: |
+            out/${{ matrix.codename }}/boot-*.img
+            out/${{ matrix.codename }}/Image.gz
+            out/${{ matrix.codename }}/*.dtb
+            out/${{ matrix.codename }}/SHA256SUMS
+            out/${{ matrix.codename }}/build.log
+          retention-days: 30
+          if-no-files-found: error

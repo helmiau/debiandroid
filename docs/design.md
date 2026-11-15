@@ -154,3 +154,18 @@ Two guards adopted from a comparable hardware bring-up project (Xiaomi Mi 11 Pro
 2. the target filesystem contains `ROOT_MARKER` (default `/etc/debiandroid-root`) when the mode is dual-boot or reinstalling.
 
 Dedicated mode additionally requires an explicit `--format` flag; a missing flag aborts instead of guessing. `scripts/lib/partition-guard.sh` implements both checks and is reused by `install.sh` and the TWRP `update-binary`.
+
+## 13. CI build pipeline
+
+Two workflows, both Ubuntu 24.04 runners (x86_64) with an AArch64 cross toolchain.
+
+| Workflow | Trigger | Job |
+|---|---|---|
+| `build-kernel.yml` | `workflow_dispatch` (choose codename) or `v*` tag | preflight, pin verify, kernel build, `boot.img`, checksums, artifact upload |
+| `release.yml` | `v*` tag | matrix over codenames, build, then publish `boot-<codename>.img` + `SHA256SUMS` to the Release |
+
+Device-specific kernel configuration is expressed as a base defconfig plus a Kconfig fragment in `kernel/config/<codename>-server.config`, merged with `scripts/kconfig/merge_config.sh`. For santoni the base is `santoni_openwrt_defconfig` from the pinned community tree, and the fragment adds the missing server essentials: USB configfs gadget (NCM/RNDIS/ECM), ext4, loop devices, initramfs support, netfilter.
+
+The runner compiles only kernel and boot image. Rootfs tarballs are built separately and published as release assets; they are not part of the kernel job.
+
+Local dry runs (`--dry-run`) exercise the same code paths without a toolchain, so the workflow logic can be checked on any host.

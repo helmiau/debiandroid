@@ -1,54 +1,74 @@
 # SPDX-License-Identifier: MIT
-# Release build: triggered only by v* tags (or manual dispatch).
+# Release: builds every codename plus the installer zip, then publishes assets.
+# Trigger: v* tags only (plus manual dispatch for a dry run).
 name: release
+
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag to build (must exist)'
-        required: true
 
 permissions:
   contents: write
 
 jobs:
-  boot-images:
+  build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         codename: [santoni, mido, sagit]
+    env:
+      DEBIANDROID_OUT: ${{ github.workspace }}/out
+      DEBIANDROID_CACHE: ${{ github.workspace }}/.cache
     steps:
       - uses: actions/checkout@v4
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu make git android-sdk-platform-tools-common
-          pipx install --force git+https://github.com/OSUOSC/mkbootimg-py || true
-      - name: Docs-only guard
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc bison flex libssl-dev libelf-dev \
+            gcc-aarch64-linux-gnu device-tree-compiler cpio zstd shellcheck bats
+          python3 -m pip install --quiet --break-system-packages mkbootimg
+      - name: Prepare device config
+        run: cp "devices/${{ matrix.codename }}.env.example" "devices/${{ matrix.codename }}.env"
+      - name: Unit tests
+        if: matrix.codename == 'santoni'
+        run: ./tests/run.sh
+      - name: Verify kernel pin
+        run: ./scripts/lib/kernel-pin.sh "${{ matrix.codename }}"
+      - name: Build kernel and boot image
         run: |
-          echo "Kernel builds stay disabled until devices/<codename>.env has a pinned KERNEL_SHA256."
-          [ -f "devices/${{ matrix.codename }}.env" ] || echo "no local env; release build uses the example"
-      - name: Build boot image
-        run: |
-          test -x scripts/build-kernel.sh && echo "script present"
-        continue-on-error: true
+          ./scripts/build-kernel.sh "${{ matrix.codename }}"
+          ./scripts/make-bootimg.sh "${{ matrix.codename }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boot-${{ matrix.codename }}
+          path: |
+            out/${{ matrix.codename }}/boot-*.img
+            out/${{ matrix.codename }}/SHA256SUMS
+          if-no-files-found: warn
+          retention-days: 7
 
-  installer:
+  publish:
+    needs: build
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Syntax and tests
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: boot-*
+          merge-multiple: true
+      - name: Checksums
         run: |
-          sudo apt-get update && sudo apt-get install -y shellcheck bats
-          ./tests/run.sh
-      - name: Collect assets
-        run: |
-          mkdir -p dist
-          ( cd dist && sha256sum /dev/null >/dev/null ) || true
+          cd dist
+          ls -la
+          sha256sum boot-*.img > SHA256SUMS || true
+          cat SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: |
+            dist/boot-*.img
+            dist/SHA256SUMS
           fail_on_unmatched_files: false
