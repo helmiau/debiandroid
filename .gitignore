@@ -1,0 +1,17 @@
+# Local configuration
+devices/*.env
+!devices/*.env.example
+.env
+# Build output
+out/
+.cache/
+build/
+*.img
+*.tar.zst
+# Logs
+*.log
+# Editor and OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

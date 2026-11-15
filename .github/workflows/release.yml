@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: MIT
+# Release build: triggered only by v* tags (or manual dispatch).
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (must exist)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  boot-images:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        codename: [santoni, mido, sagit]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu make git android-sdk-platform-tools-common
+          pipx install --force git+https://github.com/OSUOSC/mkbootimg-py || true
+      - name: Docs-only guard
+        run: |
+          echo "Kernel builds stay disabled until devices/<codename>.env has a pinned KERNEL_SHA256."
+          [ -f "devices/${{ matrix.codename }}.env" ] || echo "no local env; release build uses the example"
+      - name: Build boot image
+        run: |
+          test -x scripts/build-kernel.sh && echo "script present"
+        continue-on-error: true
+
+  installer:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and tests
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck bats
+          ./tests/run.sh
+      - name: Collect assets
+        run: |
+          mkdir -p dist
+          ( cd dist && sha256sum /dev/null >/dev/null ) || true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          fail_on_unmatched_files: false
