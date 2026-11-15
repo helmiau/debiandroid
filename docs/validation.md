@@ -71,3 +71,21 @@ File hardware results with the issue template. Redact identifiers. Attach the im
 | shellcheck | not installed on the authoring host | NOT RUN |
 
 Not validated: any on-device boot. The santoni handset was not connected during P2.
+
+## P2 build validation (2026-11-16)
+
+CI run `43763461156`, commit `c8713ef`, GitHub Actions `ubuntu-24.04`.
+
+| Check | Result |
+|---|---|
+| Kernel compile | PASS, 2173 objects, no warnings or errors in `build.log` |
+| Boot image | PASS, `ANDROID!` v0, page 2048, kernel 8483501 bytes, page-aligned |
+| Kernel address | PASS, `0x80008000` from `BOOTIMG_BASE + BOOTIMG_KERNEL_OFFSET` |
+| Cmdline | PASS, `console=ttyMSM0,115200n8 root=/dev/ram0 rw` |
+| Checksums | PASS, `sha256sum -c SHA256SUMS` on `Image.gz` and the DTB |
+| DTB | PASS, `msm8940-xiaomi-santoni.dtb`, 54520 bytes |
+| Fragment applied | PASS, built `configfs.o`, `f_ncm.o`, `f_rndis.o`, `f_ecm.o`, `loop.o`, `ext4/inode.o`, `udc/core.o`, `chipidea/udc.o`, `ci_hdrc_msm.o` |
+
+Artifacts: `Image.gz` 8.1 MB, `boot-santoni.img` 8.1 MB, DTB 54.5 KB.
+
+Not validated: the image was never booted. No hardware was attached during P2.

@@ -328,7 +328,7 @@ FASTBOOT_BIN=fastboot
 |---|---|---|
 | P0 | Documentation: PRD, README, AGENTS, design | Consistent and cross-referenced |
 | P1 | Repo skeleton, `devices/*.env.example`, preflight, `--dry-run` | `--dry-run` exits 0 for santoni, mido, and sagit |
-| P2 | `build-kernel.sh` + `make-bootimg.sh` for santoni | `boot.img` for santoni boots via `fastboot boot` |
+| P2 | `build-kernel.sh` + `make-bootimg.sh` for santoni in CI | `boot.img` built and verified; boot test pending hardware |
 | P3 | `initramfs/`, `rootfs/debian.sh`, `install.sh --mode dual-boot` | SSH into santoni, `findmnt /` shows loop |
 | P4 | mido build + network, then sagit build, `usb0` gadget, Debian | SSH over `wlan0` (mido) and `usb0` (sagit) |
 | P5 | Ubuntu and prebuilt backends, dedicated mode | All three backends and both modes pass |
