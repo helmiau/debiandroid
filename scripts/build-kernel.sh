@@ -28,8 +28,13 @@ if [ ! -d "$SRC/.git" ]; then
   info "cloning $KERNEL_REPO -> $SRC"
   run git clone --filter=blob:none "$KERNEL_REPO" "$SRC"
 fi
-run git -C "$SRC" fetch --all --tags --quiet
-run git -C "$SRC" checkout --quiet "$KERNEL_REF"
+run git -C "$SRC" fetch --all --tags --force --quiet
+# Check out the pinned commit, not a mutable branch or tag name.
+if [ -n "${KERNEL_COMMIT:-}" ]; then
+  run git -C "$SRC" checkout --quiet --detach "$KERNEL_COMMIT"
+else
+  run git -C "$SRC" checkout --quiet "$KERNEL_REF"
+fi
 if [ "$DRY_RUN" = "1" ] && [ ! -d "$SRC/.git" ]; then
   log "[dry-run] would verify HEAD == $KERNEL_COMMIT"
   head_sha="<dry-run>"

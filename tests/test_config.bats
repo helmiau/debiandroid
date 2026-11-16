@@ -137,3 +137,25 @@ assert len(d)%2048==0
   run "$PY" "$REPO_ROOT/scripts/lib/mkbootimg.py" --kernel "$wtmp/k.gz" --cmdline "$long" --output "$wtmp/b.img"
   [ "$status" -eq 2 ]
 }
+
+@test "kernel-pin dry-run mentions tags as well as branches" {
+  cp "$REPO_ROOT/devices/mido.env.example" "$DEBIANDROID_REPO_ROOT/devices/mido.env"
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" \
+      "$REPO_ROOT/scripts/lib/kernel-pin.sh" mido --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"refs/tags/"* ]]
+}
+
+@test "mido and sagit pin the same verified upstream tag" {
+  run grep -x "KERNEL_REF=v6.19" "$REPO_ROOT/devices/mido.env.example"
+  [ "$status" -eq 0 ]
+  run grep -x "KERNEL_REF=v6.19" "$REPO_ROOT/devices/sagit.env.example"
+  [ "$status" -eq 0 ]
+  run grep -x "KERNEL_COMMIT=05f7e89ab9731565d8a62e3b5d1ec206485eeb0b" "$REPO_ROOT/devices/sagit.env.example"
+  [ "$status" -eq 0 ]
+}
+
+@test "sagit uses 4096-byte boot pages for UFS" {
+  run grep -x "BOOTIMG_PAGESIZE=4096" "$REPO_ROOT/devices/sagit.env.example"
+  [ "$status" -eq 0 ]
+}
