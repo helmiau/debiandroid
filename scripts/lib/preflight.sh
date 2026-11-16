@@ -6,6 +6,8 @@
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=common.sh
 . "$ROOT_DIR/scripts/lib/common.sh"
+# shellcheck source=platform-tools.sh
+. "$ROOT_DIR/scripts/lib/platform-tools.sh"
 
 REQUIRE_DEVICE=0
 REQUIRE_TOOLS=0
@@ -42,17 +44,16 @@ note ok "config $DEVICE ($SOC) loaded"
 
 # 2. Host tool availability (build-side only).
 if [ "$REQUIRE_TOOLS" = "1" ]; then
-  for tool in git make aarch64-linux-gnu-gcc python3 dtc; do
+  for tool in git make aarch64-linux-gnu-gcc mkbootimg; do
     if command -v "$tool" >/dev/null 2>&1; then note ok "host tool $tool"; else note fail "missing host tool $tool"; fi
   done
 fi
 
 # 3. Device visibility.
 if [ "$REQUIRE_DEVICE" = "1" ]; then
-  if ! command -v "$FASTBOOT_BIN" >/dev/null 2>&1; then
-    note fail "fastboot missing ($FASTBOOT_BIN)"
-  elif [ "$DRY_RUN" = "1" ]; then
-    note ok "[dry-run] would check '$FASTBOOT_BIN devices'"
+  require_fastboot
+  if [ "$DRY_RUN" = "1" ]; then
+    log "[dry-run] would check '$FASTBOOT_BIN devices'"
   else
     line="$("$FASTBOOT_BIN" devices 2>/dev/null | head -1 || true)"
     if [ -z "$line" ]; then

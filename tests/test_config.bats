@@ -159,3 +159,22 @@ assert len(d)%2048==0
   run grep -x "BOOTIMG_PAGESIZE=4096" "$REPO_ROOT/devices/sagit.env.example"
   [ "$status" -eq 0 ]
 }
+
+@test "platform-tools helper resolves per-OS paths" {
+  run bash -c "cd '$REPO_ROOT' && . scripts/lib/common.sh && . scripts/lib/platform-tools.sh && fastboot_bin"
+  [ "$status" -eq 0 ]
+  [[ "$output" == */platform-tools/*/fastboot* ]]
+}
+
+@test "platform-tools helper reports its platform name" {
+  run bash -c "cd '$REPO_ROOT' && . scripts/lib/common.sh && . scripts/lib/platform-tools.sh && platform_name"
+  [ "$status" -eq 0 ]
+  case "$output" in linux|darwin|windows) ;; *) false ;; esac
+}
+
+@test "flash requires fastboot via the helper, not a system binary" {
+  run grep -q "require_fastboot" "$REPO_ROOT/scripts/flash.sh"
+  [ "$status" -eq 0 ]
+  run grep -q "require_fastboot" "$REPO_ROOT/scripts/lib/preflight.sh"
+  [ "$status" -eq 0 ]
+}

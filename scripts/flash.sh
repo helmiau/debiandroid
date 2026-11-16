@@ -8,6 +8,8 @@
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/common.sh
 . "$ROOT_DIR/scripts/lib/common.sh"
+# shellcheck source=lib/platform-tools.sh
+. "$ROOT_DIR/scripts/lib/platform-tools.sh"
 
 MODE=ram
 ARGS=()
@@ -22,7 +24,7 @@ set -- "${ARGS[@]:-}"
 load_device "${1:-}"
 IMG="$OUT_DIR/$DEVICE/boot-$DEVICE.img"
 [ -f "$IMG" ] || die "boot image not built: $IMG (run scripts/make-bootimg.sh $DEVICE)"
-require_cmd "$FASTBOOT_BIN"
+require_fastboot
 
 if [ "$MODE" = "flash" ]; then
   warn "This writes partition 'boot' on $DEVICE."
