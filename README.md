@@ -140,6 +140,9 @@ debiandroid/
 | No IP address | Network service inactive | `systemctl restart systemd-networkd` |
 | santoni or sagit has no network | Wi-Fi not in mainline | Use `usb0` or an OTG adapter |
 
+Detailed recovery steps, including the Windows "Error Code 28 / Android
+Bootloader Interface missing" case: [docs/troubleshooting.md](docs/troubleshooting.md).
+
 ## Known limits
 
 - No modem: no SMS, calls, or cellular data.
@@ -154,5 +157,6 @@ debiandroid/
 | `PRD.md` | Requirements, scope, acceptance criteria |
 | `docs/design.md` | Architecture, boot chain, phases, risks |
 | `docs/validation.md` | What is proven vs not proven, per release |
+| `docs/troubleshooting.md` | Recovery mode, fastboot, and Windows driver fixes |
 | `AGENTS.md` | Working rules for coding agents |
 | `LICENSES/README.md` | License map per directory |

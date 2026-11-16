@@ -125,3 +125,19 @@ Cmdline identical across devices: `console=ttyMSM0,115200n8 root=/dev/ram0 rw`.
 Note: `Image.gz` on mido and sagit is ~15 MB versus ~8 MB on santoni because those two use the full upstream `defconfig` rather than the trimmed santoni defconfig. This still fits the devices' boot partitions but leaves less room for initramfs.
 
 Boot on hardware: NOT VALIDATED for all three.
+
+## P2 hardware attempt (2026-11-16)
+
+Attempted `fastboot boot` on santoni. Not completed.
+
+| Step | Result |
+|---|---|
+| ADB connect (Android mode) | PASS, `device:santoni`, serial 61459b807d04 |
+| `adb reboot bootloader` | PASS, ADB disconnected as expected |
+| Device visible as `VID_18D1&PID_D00D` | PASS |
+| `fastboot devices` | FAIL, empty |
+| Windows Device Manager | Error Code 28, no Android Bootloader Interface driver |
+
+Cause: Windows has no Google USB Driver installed, so the bootloader interface is unbound. Procedure documented in `docs/troubleshooting.md`.
+
+Consequence: no on-device boot has been performed for any device. All P2 claims remain build-and-artifact only.
