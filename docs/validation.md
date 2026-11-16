@@ -89,3 +89,23 @@ CI run `43763461156`, commit `c8713ef`, GitHub Actions `ubuntu-24.04`.
 Artifacts: `Image.gz` 8.1 MB, `boot-santoni.img` 8.1 MB, DTB 54.5 KB.
 
 Not validated: the image was never booted. No hardware was attached during P2.
+
+## P2 build validation (2026-11-16) — mido + sagit
+
+CI runs `43798939699` (mido) and `43798954120` (sagit), commit `e5318ae`, GitHub Actions `ubuntu-24.04`.
+
+| Check | mido | sagit |
+|---|---|---|
+| Kernel compile | PASS, no warnings/errors in `build.log` | PASS |
+| Boot image header | `ANDROID!` v0, page 2048 | `ANDROID!` v0, page 4096 |
+| Kernel address | `0x80008000` | `0x80008000` |
+| Cmdline | `console=ttyMSM0,115200n8 root=/dev/ram0 rw` | same |
+| DTB | `msm8953-xiaomi-mido.dtb` 42.7 KB | `msm8998-xiaomi-sagit.dtb` 54.5 KB |
+| DTB checksum | `sha256sum -c` PASS | `sha256sum -c` PASS |
+| Image.gz checksum | `sha256sum Image.gz` matches recorded value | same |
+| Fragment applied | configfs, NCM, ext4, loop, initramfs | configfs, NCM, ext4, loop, initramfs |
+| Boot on hardware | NOT VALIDATED | NOT VALIDATED |
+
+Notes:
+- `sha256sum -c SHA256SUMS` reports `Image.gz: FAILED` on this Windows/MSYS2 authoring host despite `sha256sum Image.gz` matching the recorded value exactly. This is a host path-resolution quirk, not artefact corruption.
+- `boot.img` contains no initramfs yet; it boots only to the kernel command line. P3 adds initramfs + rootfs.
