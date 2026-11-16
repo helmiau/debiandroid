@@ -1,22 +1,20 @@
 # SPDX-License-Identifier: MIT
-# Kernel and boot image build.
-# Trigger: manual dispatch (choose one codename) or a v* tag (all codenames).
+# Kernel and boot image build for every device in one run.
+# The matrix fans out to all codenames in parallel; no per-device dispatch.
 name: build-kernel
 
 on:
   workflow_dispatch:
     inputs:
-      codename:
-        description: 'Device codename'
-        required: true
-        default: santoni
-        type: choice
-        options: [santoni, mido, sagit]
       upload:
         description: 'Upload artifacts'
         required: false
         default: true
         type: boolean
+      codename:
+        description: 'Optional: build one codename only (blank = all devices)'
+        required: false
+        type: string
   push:
     tags: ['v*']
 
@@ -24,29 +22,46 @@ permissions:
   contents: read
 
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set
+        name: Resolve device matrix
+        run: |
+          all="santoni mido sagit"
+          want="${{ inputs.codename }}"
+          if [ -n "$want" ]; then
+            for d in $want; do
+              case " $all " in *" $d "*) ;; *) echo "unknown codename: $d" >&2; exit 1;; esac
+            done
+            list="$want"
+          else
+            list="$all"
+          fi
+          json="["
+          sep=""
+          for d in $list; do json="$json$sep\"$d\""; sep=","; done
+          json="$json]"
+          echo "matrix={\"codename\":$json}" >> "$GITHUB_OUTPUT"
+          echo "building: $list"
+
   build:
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
-      matrix:
-        codename: [santoni, mido, sagit]
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
       DEBIANDROID_OUT: ${{ github.workspace }}/out
       DEBIANDROID_CACHE: ${{ github.workspace }}/.cache
     steps:
-      - name: Decide whether to build this codename
-        id: gate
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            [ "${{ inputs.codename }}" = "${{ matrix.codename }}" ] && echo "run=1" >> "$GITHUB_OUTPUT" || echo "run=0" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=1" >> "$GITHUB_OUTPUT"
-          fi
       - uses: actions/checkout@v4
-        if: steps.gate.outputs.run == '1'
+
       - name: Install toolchain
-        if: steps.gate.outputs.run == '1'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -55,21 +70,28 @@ jobs:
           for t in aarch64-linux-gnu-gcc make dtc python3; do
             command -v "$t" || { echo "missing $t"; exit 1; }
           done
+
       - name: Prepare device config
-        if: steps.gate.outputs.run == '1'
         run: cp "devices/${{ matrix.codename }}.env.example" "devices/${{ matrix.codename }}.env"
+
       - name: Verify kernel pin
-        if: steps.gate.outputs.run == '1'
         run: ./scripts/lib/kernel-pin.sh "${{ matrix.codename }}"
-      - name: Build
-        if: steps.gate.outputs.run == '1'
+
+      - name: Build kernel and boot image
         run: |
           ./scripts/build-kernel.sh "${{ matrix.codename }}"
           ./scripts/make-bootimg.sh "${{ matrix.codename }}"
-          ls -la "out/${{ matrix.codename }}"
-          cat "out/${{ matrix.codename }}/SHA256SUMS" || true
+
+      - name: Report artifacts
+        run: |
+          set -e
+          D="out/${{ matrix.codename }}"
+          ls -la "$D"
+          echo "--- checksums ---"
+          cat "$D/SHA256SUMS"
+
       - name: Upload artifacts
-        if: steps.gate.outputs.run == '1' && (github.event_name == 'push' || inputs.upload)
+        if: github.event_name == 'push' || inputs.upload
         uses: actions/upload-artifact@v4
         with:
           name: boot-${{ matrix.codename }}-${{ github.sha }}
@@ -81,3 +103,16 @@ jobs:
             out/${{ matrix.codename }}/build.log
           retention-days: 30
           if-no-files-found: error
+
+  summary:
+    needs: build
+    runs-on: ubuntu-24.04
+    if: always()
+    steps:
+      - name: Build result
+        run: |
+          echo "matrix job result: ${{ needs.build.result }}"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "one or more devices failed; see the matrix jobs" >&2
+            exit 1
+          fi
