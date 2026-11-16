@@ -59,3 +59,36 @@ Jika host tidak punya koneksi internet, sediakan paket offline di `vendor/platfo
 ## Kontak
 
 Laporkan masalah baru di [GitHub Issues](https://github.com/helmiau/debiandroid/issues) dengan output `fastboot devices`, `fastboot getvar unlocked`, dan `dmesg` dari ponsel jika tersedia.
+
+## `fastboot boot` gagal dengan `dtb not found`
+
+Gejala:
+
+```
+Sending 'boot.img' (8344 KB)                       OKAY
+Booting                                            FAILED (remote: 'dtb not found')
+fastboot: error: Command failed
+```
+
+Sebab: bootloader Xiaomi/Qualcomm LK (MSM8937/8953/8998) tidak membaca DTB
+sebagai section terpisah di `boot.img`. DTB harus **di-append ke kernel**
+(menjadi `Image.gz-dtb`), bukan diletakkan setelah ramdisk.
+
+Perbaikan: `scripts/make-bootimg.sh` menggabungkan kernel dan DTB sebelum
+merakit `boot.img`:
+
+```bash
+cat Image.gz msm8940-xiaomi-santoni.dtb > kernel-dtb
+```
+
+Setelah perbaikan ini, bangun ulang `boot.img`:
+
+```bash
+./scripts/build-kernel.sh santoni
+./scripts/make-bootimg.sh santoni
+fastboot boot out/santoni/boot-santoni.img
+```
+
+Kernel mainline belum memiliki initramfs, jadi setelah DTB diterima kernel
+akan berhenti setelah command line. Boot sampai sistem Debian/Ubuntu adalah
+pekerjaan P3.

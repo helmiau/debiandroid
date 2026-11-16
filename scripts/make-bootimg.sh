@@ -19,17 +19,24 @@ OUTIMG="$KDIR/boot-$DEVICE.img"
 [ -f "$KERNEL" ] || die "missing $KERNEL (run scripts/build-kernel.sh $DEVICE)"
 [ -f "$DTB" ] || die "missing $DTB (run scripts/build-kernel.sh $DEVICE)"
 
+# Xiaomi/Qualcomm LK bootloaders (MSM8937/8953/8998) expect the DTB appended
+# to the kernel (Image.gz-dtb), not as a separate boot.img section.
+KERNEL_ARG="$KERNEL"
+if [ -n "$DTB" ]; then
+  cat "$KERNEL" "$DTB" > "$KDIR/kernel-dtb"
+  KERNEL_ARG="$KDIR/kernel-dtb"
+fi
+
 PYTHON="${PYTHON:-python3}"
 command -v "$PYTHON" >/dev/null 2>&1 || die "python3 not found (set PYTHON=...)"
 
 RAMDISK_OPT=()
 [ -f "$KDIR/initramfs.cpio.gz" ] && RAMDISK_OPT=(--ramdisk "$KDIR/initramfs.cpio.gz")
 
-info "image: $OUTIMG (pagesize $BOOTIMG_PAGESIZE, board $DEVICE)"
+info "image: $OUTIMG (pagesize $BOOTIMG_PAGESIZE, board $DEVICE, appended DTB)"
 set -- \
-  --kernel "$KERNEL" \
+  --kernel "$KERNEL_ARG" \
   ${RAMDISK_OPT[@]+"${RAMDISK_OPT[@]}"} \
-  --dtb "$DTB" \
   --base "$BOOTIMG_BASE" \
   --kernel_offset "$BOOTIMG_KERNEL_OFFSET" \
   --ramdisk_offset "$BOOTIMG_RAMDISK_OFFSET" \
