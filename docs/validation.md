@@ -109,3 +109,19 @@ CI runs `43798939699` (mido) and `43798954120` (sagit), commit `e5318ae`, GitHub
 Notes:
 - `sha256sum -c SHA256SUMS` reports `Image.gz: FAILED` on this Windows/MSYS2 authoring host despite `sha256sum Image.gz` matching the recorded value exactly. This is a host path-resolution quirk, not artefact corruption.
 - `boot.img` contains no initramfs yet; it boots only to the kernel command line. P3 adds initramfs + rootfs.
+
+## Single-run parallel build (2026-11-16)
+
+Run `43804410269`, commit `0969fe7`. One `workflow_dispatch` with no codename input built all three devices in parallel and uploaded three independent artifacts.
+
+| Device | Kernel bytes | Page | `boot.img` | Header | Checksums |
+|---|---|---|---|---|---|
+| santoni | 8483532 | 2048 | 8544256 | `ANDROID!` v0 | Image.gz OK, DTB OK |
+| mido | 15493211 | 2048 | 15542272 | `ANDROID!` v0 | Image.gz OK, DTB OK |
+| sagit | 15492304 | 4096 | 15564800 | `ANDROID!` v0 | Image.gz OK, DTB OK |
+
+Cmdline identical across devices: `console=ttyMSM0,115200n8 root=/dev/ram0 rw`.
+
+Note: `Image.gz` on mido and sagit is ~15 MB versus ~8 MB on santoni because those two use the full upstream `defconfig` rather than the trimmed santoni defconfig. This still fits the devices' boot partitions but leaves less room for initramfs.
+
+Boot on hardware: NOT VALIDATED for all three.
