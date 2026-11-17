@@ -73,7 +73,9 @@ a symbol whose dependencies are unmet and `merge_config.sh` only warns. The
 5. find the root filesystem: a partition named `debiandroid` (dedicated mode) or
    `<userdata>/debian-server/rootfs` (dual-boot mode);
 6. in test mode, arm a dead-man timer of `DEADMAN_SECONDS` (default 300): if the system
-   does not write `/var/log/debiandroid/healthy-<boot_id>`, the device reboots;
+   does not write `/run/debiandroid/healthy-<boot_id>`, the device reboots. The stamp is in
+   `/run` because that tmpfs is visible after `switch_root`; `rootfs/overlay` installs the
+   `debiandroid-health` unit that writes it, ordered after `sshd`;
 7. `switch_root` into the rootfs and exec `runit` (or `/sbin/init`).
 
 Build-time settings live in `/debiandroid.conf` inside the archive. Any failure drops to
@@ -107,12 +109,12 @@ the host). Rootfs backends:
 |---|---|---|
 | P0 | Documents (PRD, README, AGENTS, design) | Four documents exist and are consistent |
 | P1 | Repo skeleton: `devices/*.env.example`, preflight, `--dry-run` | `--dry-run` works for both codenames |
-| P2 | santoni kernel + boot.img | `fastboot boot` shows kernel log and running initramfs |
-| P3 | initramfs + Debian + dual-boot on santoni | SSH login from the loop rootfs |
-| P4 | mido, then sagit: kernel + `usb0` gadget + Debian | SSH over `usb0` succeeds |
-| P5 | Ubuntu + prebuilt + dedicated | All three backends and both modes verified |
-| P6 | TWRP zip installer + `v*` release workflow | tag `v0.1.0` produces all assets |
-| P7 | Automated tests, final documentation | `shellcheck` clean, `bats` green, README final |
+| P2 (done) | Build pipeline, verification, `stock-repack`, initramfs | 37/37 tests; artifacts verified; no device boot |
+| P3 | santoni on the vendor kernel: backup, repack, recovery flash, read-back | `verify-flash.sh` match; SSH or rescue console |
+| P4 | lk2nd + mainline on santoni, then mido | kernel 6.x boots; SSH over `usb0` |
+| P5 | containers, Ubuntu/prebuilt backends, dedicated mode | `docker run hello-world`; all backends and modes |
+| P6 | sagit on aboot mainline; dreamlte out of scope | SSH on sagit or documented blocker |
+| P7 | TWRP installer, release workflow, CI test job | `v0.1.0` assets; CI green |
 
 ## 7. Risk matrix
 

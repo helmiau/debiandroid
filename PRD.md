@@ -334,12 +334,12 @@ FASTBOOT_BIN=fastboot
 |---|---|---|
 | P0 | Documentation: PRD, README, AGENTS, design | Consistent and cross-referenced |
 | P1 | Repo skeleton, `devices/*.env.example`, preflight, `--dry-run` | `--dry-run` exits 0 for santoni, mido, and sagit |
-| P2 | `build-kernel.sh` + `make-bootimg.sh` for santoni, mido, sagit in CI | `boot.img` built for all three; header and checksums verified; boot test pending hardware |
-| P3 | `initramfs/`, `rootfs/debian.sh`, `install.sh --mode dual-boot` | SSH into santoni, `findmnt /` shows loop |
-| P4 | mido build + network, then sagit build, `usb0` gadget, Debian | SSH over `wlan0` (mido) and `usb0` (sagit) |
-| P5 | Ubuntu and prebuilt backends, dedicated mode | All three backends and both modes pass |
-| P6 | TWRP zip installer + `v*` release workflow | tag `v0.1.0` produces 9 assets + `SHA256SUMS` |
-| P7 | Automated tests, final documentation | `shellcheck` clean, `bats` green, README final |
+| P2 (done) | Build pipeline, structural verification, `stock-repack` flavor, initramfs with rescue console and dead-man timer | 37/37 tests green; artifacts verified structurally; no device boot yet |
+| P3 | Hardware proof on santoni with the vendor kernel: backup, initramfs, repack, recovery flash, read-back | `verify-flash.sh` reports a match; SSH or the rescue console answers |
+| P4 | lk2nd + mainline on santoni, then mido (lk2nd has targets for both) | kernel 6.x boots; `findmnt /` shows the expected root; SSH over `usb0` |
+| P5 | Containers on the mainline build; Ubuntu and prebuilt backends; dedicated mode | `docker run --rm hello-world`; all backends and both modes pass |
+| P6 | sagit on aboot mainline (lk2nd has no msm8998 target); dreamlte stays out of scope | SSH on sagit, or a documented blocker |
+| P7 | TWRP zip installer, `v*` release workflow, CI test job | tag `v0.1.0` produces 9 assets + `SHA256SUMS`; CI runs shellcheck and bats |
 
 ## 24. Acceptance Criteria and Definition of Done
 

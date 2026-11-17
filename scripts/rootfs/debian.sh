@@ -30,6 +30,16 @@ info "debootstrap bookworm arm64 -> $RUMP"
 run debootstrap --arch=arm64 --variant=minbase --include=openssh-server,systemd-sysv,iproute2,zstd \
   bookworm "$RUMP" http://deb.debian.org/debian
 info "(CI adds snapshot pinning for the snapshot channel)"
+# Overlay: the health stamp unit and anything else the image needs at boot.
+OVERLAY="$ROOT_DIR/rootfs/overlay"
+if [ -d "$OVERLAY" ]; then
+  info "applying rootfs overlay $OVERLAY"
+  run cp -a "$OVERLAY/." "$RUMP/"
+  run mkdir -p "$RUMP/etc/systemd/system/multi-user.target.wants"
+  run ln -sf /etc/systemd/system/debiandroid-health.service \
+    "$RUMP/etc/systemd/system/multi-user.target.wants/debiandroid-health.service"
+fi
+run touch "$RUMP$ROOT_MARKER"
 info "tarball: $TARBALL"
 
 if [ "$DRY_RUN" = "1" ]; then

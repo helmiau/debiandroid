@@ -162,11 +162,15 @@ fi
 # --- 4. dead-man timer (test mode only) ---------------------------------------
 if [ "$MODE" = "test" ]; then
   BID="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"
-  log "test mode: dead-man timer ${DEADMAN_SECONDS}s (boot_id=$BID)"
+  # The stamp is in /run, which survives switch_root as tmpfs inside the new
+  # root. A path under the old mount tree would not: switch_root replaces it.
+  STAMP="/run/debiandroid/healthy-$BID"
+  log "test mode: dead-man timer ${DEADMAN_SECONDS}s (stamp $STAMP)"
   (
     sleep "$DEADMAN_SECONDS"
-    if [ ! -f "$ROOT$HEALTH_DIR/healthy-$BID" ]; then
-      echo "deadman: no healthy-$BID after ${DEADMAN_SECONDS}s; rebooting" >> "$LOGF" 2>/dev/null
+    if [ ! -f "$STAMP" ]; then
+      echo "deadman: no $STAMP after ${DEADMAN_SECONDS}s; rebooting" >> "$LOGF" 2>/dev/null
+      echo "deadman: no $STAMP; rebooting" > /dev/kmsg 2>/dev/null
       clear_bcb
       sync
       reboot -f

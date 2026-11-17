@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MIT
+# Writes the health stamp the test-mode initramfs waits for.
+#
+# The initramfs arms a dead-man timer (default 300 s) that reboots the device
+# unless this file exists. It is ordered after sshd, so "healthy" means the
+# system reached multi-user and SSH is listening, not merely that PID 1 ran.
+#
+# The stamp lives in /run: tmpfs inside the new root, visible to the timer
+# process after switch_root. A path under /mnt would not be, because the old
+# mount tree is gone once switch_root has replaced the root.
+#
+# boot_id changes on every boot, so a stale stamp can never satisfy a new boot.
+[Unit]
+Description=debiandroid health stamp for the initramfs dead-man timer
+After=sshd.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'mkdir -p /run/debiandroid && cat /proc/sys/kernel/random/boot_id > /run/debiandroid/healthy-$(cat /proc/sys/kernel/random/boot_id)'
+
+[Install]
+WantedBy=multi-user.target
