@@ -73,7 +73,11 @@ case "$MODE" in
     warn "This writes the lk2nd second-stage bootloader for $LK2ND_TARGET to $DEVICE."
     warn "After it, 'boot' is written at a 512 KiB offset and holds the kernel; Android's"
     warn "stock boot path is replaced. Restore source: out/$DEVICE/stock/boot-stock-$DEVICE.img"
-    confirm "Flash $LK2ND_TARGET lk2nd to $DEVICE?"
+    if [ "$CONFIRM_YES" = "1" ]; then
+      warn "flag --yes given, no interactive confirmation"
+    else
+      confirm "Flash $LK2ND_TARGET lk2nd to $DEVICE?"
+    fi
     run "$FASTBOOT_BIN" flash lk2nd "$IMG"
     info "wrote lk2nd; the device now boots lk2nd, which exposes 'boot' at the offset"
     info "next: scripts/flash.sh $DEVICE --flash-recovery --image <test image>"
