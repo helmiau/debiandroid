@@ -26,7 +26,7 @@ Mainline status: mido has the best networking support (WLAN/Bluetooth 6.4); sagi
 # 1. Prepare the device configuration
 cp devices/santoni.env.example devices/santoni.env
 
-# 2. Build kernel and boot image
+# 2. Build kernel and boot image (make-bootimg.sh runs the structural validator)
 ./scripts/build-kernel.sh santoni
 ./scripts/make-bootimg.sh santoni
 
@@ -93,7 +93,7 @@ The `snapshot` channel is reproducible; `stable` uses the latest packages at rel
 
 ```bash
 ./scripts/build-kernel.sh <codename> [--clean]
-./scripts/make-bootimg.sh <codename>
+./scripts/make-bootimg.sh <codename> [--verbose]   # run also verify-bootimg.py [--verbose]
 ./scripts/flash.sh <codename> [--ram-boot|--flash-boot]
 ./scripts/rootfs/debian.sh <codename> [--mode dual-boot|dedicated] [--size 4G]
 ./scripts/install.sh <codename> --mode dual-boot|dedicated
