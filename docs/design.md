@@ -26,6 +26,14 @@ Two kernel sources are supported, selected by `KERNEL_FLAVOR` in `devices/<coden
 | `mainline` (default) | built from `KERNEL_REPO` | built from source, appended to the kernel | everything | high: every artifact is unproven until a device boots it |
 | `stock-repack` | the vendor's, byte for byte | the vendor's, byte for byte | only the initramfs | low: the bootloader already accepts these bytes |
 
+`mainline` on MSM8953/MSM8940 is only proven with a second-stage bootloader: lk2nd has
+targets for both (msm8953 for mido, msm8952 with an `msm8940-xiaomi-santoni` DTS for
+santoni) and is what KlipperPhonesLinux and postmarketOS use. Stock aboot alone has not
+been shown to load a freshly built modern kernel on either SoC. `devices/*.env` gains a
+`BOOTLOADER=aboot|lk2nd` key; `aboot` stays the default until lk2nd is verified on
+hardware. lk2nd has no msm8998 or Exynos target, so sagit and dreamlte are out of the
+near-term mainline matrix.
+
 `stock-repack` exists because a failed mainline attempt on santoni (2026-11-16) left the
 device in EDL. It is the same approach as a51-server-os: keep what the bootloader
 validates, replace what it does not look at. Xiaomi's published source does not always
