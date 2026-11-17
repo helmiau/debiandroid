@@ -26,8 +26,13 @@ RUMP="$CACHE_DIR/rootfs/debian-$DEVICE"
 TARBALL="$CACHE_DIR/rootfs/rootfs-debian-arm64-stable-$DEVICE.tar.zst"
 run mkdir -p "$CACHE_DIR/rootfs"
 
+PACKAGES=openssh-server,systemd-sysv,iproute2,zstd
+if [ "${KIOSK:-0}" = "1" ]; then
+  info "KIOSK=1: adding cage and Epiphany for the panel"
+  PACKAGES="$PACKAGES,cage,epiphany-browser,libgl1-mesa-dri,fonts-dejavu-core"
+fi
 info "debootstrap bookworm arm64 -> $RUMP"
-run debootstrap --arch=arm64 --variant=minbase --include=openssh-server,systemd-sysv,iproute2,zstd \
+run debootstrap --arch=arm64 --variant=minbase --include="$PACKAGES" \
   bookworm "$RUMP" http://deb.debian.org/debian
 info "(CI adds snapshot pinning for the snapshot channel)"
 # Overlay: the health stamp unit and anything else the image needs at boot.
@@ -38,6 +43,11 @@ if [ -d "$OVERLAY" ]; then
   run mkdir -p "$RUMP/etc/systemd/system/multi-user.target.wants"
   run ln -sf /etc/systemd/system/debiandroid-health.service \
     "$RUMP/etc/systemd/system/multi-user.target.wants/debiandroid-health.service"
+  if [ "${KIOSK:-0}" = "1" ]; then
+    run ln -sf /etc/systemd/system/debiandroid-kiosk.service \
+      "$RUMP/etc/systemd/system/multi-user.target.wants/debiandroid-kiosk.service"
+    info "kiosk unit enabled; edit /etc/debiandroid/kiosk.conf for the URL"
+  fi
 fi
 run touch "$RUMP$ROOT_MARKER"
 info "tarball: $TARBALL"

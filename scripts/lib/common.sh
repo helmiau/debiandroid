@@ -69,6 +69,20 @@ load_device() {
     mainline|stock-repack) ;;
     *) die "$file: KERNEL_FLAVOR must be mainline or stock-repack (got $KERNEL_FLAVOR)" ;;
   esac
+  BOOTLOADER="${BOOTLOADER:-aboot}"
+  case "$BOOTLOADER" in
+    aboot) ;;
+    lk2nd)
+      local lk
+      for lk in LK2ND_TARGET LK2ND_URL LK2ND_SHA256; do
+        [ -n "${!lk:-}" ] || die "$file: BOOTLOADER=lk2nd needs $lk"
+      done
+      [ "${#LK2ND_SHA256}" -eq 64 ] || die "$file: LK2ND_SHA256 must be a 64-character SHA-256"
+      ;;
+    *) die "$file: BOOTLOADER must be aboot or lk2nd (got $BOOTLOADER)" ;;
+  esac
+  KIOSK="${KIOSK:-0}"
+  case "$KIOSK" in 0|1) ;; *) die "$file: KIOSK must be 0 or 1" ;; esac
   local key
   local -a needed=(DEVICE SOC ROOT_PARTNAME_EXPECTED ROOT_MARKER MIN_FREE_GB)
   if [ "$KERNEL_FLAVOR" = mainline ]; then
@@ -83,7 +97,8 @@ load_device() {
     case "$NET_MODE" in wlan0|usb0|eth0) ;; *) die "$file: NET_MODE must be wlan0, usb0, or eth0" ;; esac
   fi
   [ "${MIN_FREE_GB:-0}" -ge 1 ] 2>/dev/null || die "$file: MIN_FREE_GB must be a positive integer"
-  export DEVICE SOC KERNEL_FLAVOR KCONFIG_FRAGMENT_EXTRA KERNEL_REPO KERNEL_REF KERNEL_COMMIT KERNEL_ARCHIVE_SHA256 DEFCONFIG DTB_NAME DTB_VARIANT \
+  export DEVICE SOC KERNEL_FLAVOR KCONFIG_FRAGMENT_EXTRA BOOTLOADER KIOSK \
+         LK2ND_TARGET LK2ND_URL LK2ND_SHA256 KERNEL_REPO KERNEL_REF KERNEL_COMMIT KERNEL_ARCHIVE_SHA256 DEFCONFIG DTB_NAME DTB_VARIANT \
          BOOTIMG_PAGESIZE BOOTIMG_BASE CMDLINE NET_MODE ROOT_PARTNAME_EXPECTED ROOT_MARKER MIN_FREE_GB
 }
 

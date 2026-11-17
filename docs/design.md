@@ -19,6 +19,8 @@ flowchart TD
 ```
 
 Implication: no EFI stub, GRUB, or new firmware is required. A valid `boot.img` is enough.
+`mainline` on msm8953/msm8940 also needs a second-stage bootloader: lk2nd. It is written by `fastboot flash lk2nd` (the stock bootloader is used once, in `fastboot boot lk2nd.img`, to get there), occupies the first 512 KiB of the `boot` partition, and then exposes `boot` at that offset. Images are taken from the pinned upstream release: 322 KiB for `msm8952` (santoni) and 360 KiB for `msm8953` (mido). lk2nd carries no network stack; it loads the kernel and nothing else.
+
 Two kernel sources are supported, selected by `KERNEL_FLAVOR` in `devices/<codename>.env`:
 
 | Flavor | Kernel | DTB | What changes | Risk |
@@ -94,6 +96,14 @@ release advertises an asset that is not built.
 |---|---|---|
 | dual-boot | Directory `/data/debian-server/rootfs` on the data partition; no loop device is needed because Android is not running | Android update can overwrite boot; limited space |
 | dedicated | Dedicated ext4 partition, Android erased; kernel in the boot partition | Destructive, no return without a restore |
+
+## 4b. Kiosk display
+`KIOSK=1` adds `cage` (a single-window Wayland compositor over DRM/KMS) and
+`epiphany-browser` to the image and enables `debiandroid-kiosk.service`. The unit reads
+`KIOSK_URL` from `/etc/debiandroid/kiosk.conf`, default `http://127.0.0.1:8080/`, so the
+device behaves like an OpenWrt panel: boot, then show one page. Adreno is driven by
+freedreno in the mainline kernel; no proprietary userspace is involved. The unit runs as
+root until a dedicated account is provisioned, and it is off unless `KIOSK=1`.
 
 ## 5. Networking
 

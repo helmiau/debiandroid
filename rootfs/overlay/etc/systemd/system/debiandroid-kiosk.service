@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT
+# Fullscreen browser on the phone panel, OpenWrt style: one URL, no desktop.
+#
+# Opt-in: enabled only when KIOSK=1 in devices/<codename>.env (scripts/rootfs/debian.sh).
+# cage is a single-window Wayland compositor on DRM/KMS; Epiphany (WebKitGTK) renders
+# the page. On msm8953/msm8940 the mainline kernel drives the panel and Adreno through
+# freedreno, so no proprietary driver is involved.
+#
+# KIOSK_URL comes from /etc/debiandroid/kiosk.conf (KIOSK_URL=http://127.0.0.1:8080/).
+[Unit]
+Description=debiandroid kiosk browser on the panel
+After=systemd-user-sessions.service network-online.target
+Wants=network-online.target
+Conflicts=getty@tty1.service
+[Service]
+Type=simple
+EnvironmentFile=-/etc/debiandroid/kiosk.conf
+Environment=KIOSK_URL=http://127.0.0.1:8080/
+Environment=WLR_BACKENDS=drm
+# A browser as root is not ideal; a dedicated account needs userspace setup inside the
+# image and is tracked separately. The unit is off unless KIOSK=1.
+ExecStart=/usr/bin/cage -- /usr/bin/epiphany-browser --application-mode ${KIOSK_URL}
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

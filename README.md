@@ -29,7 +29,9 @@ cp devices/santoni.env.example devices/santoni.env
 # 2. Save the stock boot and recovery images (the only reliable restore path)
 ./scripts/backup-stock.sh santoni
 
-# 3. Build the initramfs (needs a static ARM64 busybox)
+# 3. Fetch the pinned lk2nd image (needed once, before any mainline boot on msm8940/msm8953)
+./scripts/fetch-lk2nd.sh santoni
+# 4. Build the initramfs (needs a static ARM64 busybox)
 ./scripts/initramfs/build.sh santoni --mode test
 
 # 4a. Safe path: keep the vendor kernel, replace only the initramfs
@@ -40,6 +42,7 @@ cp devices/santoni.env.example devices/santoni.env
 ./scripts/make-bootimg.sh santoni
 
 # 5. Test from the recovery partition, then prove the write by reading it back
+./scripts/flash.sh santoni --flash-lk2nd      # once, replaces the stock boot path
 ./scripts/flash.sh santoni --flash-recovery --image out/santoni/boot-santoni-stock-test.img
 ./scripts/verify-flash.sh santoni recovery out/santoni/boot-santoni-stock-test.img
 
@@ -130,6 +133,7 @@ debiandroid/
 ├── scripts/
 │   ├── build-kernel.sh
 │   ├── make-bootimg.sh
+│   ├── fetch-lk2nd.sh
 │   ├── flash.sh
 │   ├── install.sh
 │   ├── fetch.sh

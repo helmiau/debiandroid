@@ -140,3 +140,67 @@ PYEOF
   [ "$status" -eq 0 ]
   [[ "$output" == *"rootfs-debian-arm64-stable"* ]]
 }
+
+make_lk2nd_env() {
+  cat > "$BATS_TEST_TMPDIR/repo/devices/lk2nddev.env" <<'ENV'
+DEVICE=lk2nddev
+SOC=msm8940
+KERNEL_FLAVOR=mainline
+KERNEL_REPO=local
+KERNEL_REF=main
+DEFCONFIG=msm8937_defconfig
+DTB_NAME=qcom/x.dtb
+BOOTIMG_PAGESIZE=2048
+BOOTIMG_BASE=0x80000000
+CMDLINE="console=ttyMSM0"
+NET_MODE=usb0
+ROOT_PARTNAME_EXPECTED=userdata
+ROOT_MARKER=/etc/debiandroid-root
+MIN_FREE_GB=4
+BOOTLOADER=lk2nd
+LK2ND_TARGET=msm8952
+LK2ND_URL=https://example.invalid/lk2nd-msm8952.img
+LK2ND_SHA256=0000000000000000000000000000000000000000000000000000000000000000
+ENV
+}
+
+@test "lk2nd fetch dry-run reports the pinned source and target" {
+  make_lk2nd_env
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" DEBIANDROID_OUT="$DEBIANDROID_OUT" \
+      "$REPO_ROOT/scripts/fetch-lk2nd.sh" lk2nddev --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"example.invalid/lk2nd-msm8952.img"* ]]
+  [[ "$output" == *"lk2nd-msm8952.img"* ]]
+}
+
+@test "lk2nd fetch rejects an image whose hash differs" {
+  make_lk2nd_env
+  printf 'not-lk2nd' > "$BATS_TEST_TMPDIR/bad.img"
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" DEBIANDROID_OUT="$DEBIANDROID_OUT" \
+      "$REPO_ROOT/scripts/fetch-lk2nd.sh" lk2nddev --from "$BATS_TEST_TMPDIR/bad.img"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"checksum mismatch"* ]]
+}
+
+@test "flash refuses an lk2nd image that does not match the pin" {
+  make_lk2nd_env
+  mkdir -p "$DEBIANDROID_OUT/lk2nddev"
+  printf 'junk' > "$DEBIANDROID_OUT/lk2nddev/lk2nd-msm8952.img"
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" DEBIANDROID_OUT="$DEBIANDROID_OUT" \
+      FASTBOOT_BIN=true "$REPO_ROOT/scripts/flash.sh" lk2nddev --flash-lk2nd --dry-run
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"refusing to flash"* ]]
+}
+
+@test "flash dry-runs an lk2nd image that matches the pin" {
+  make_lk2nd_env
+  mkdir -p "$DEBIANDROID_OUT/lk2nddev"
+  printf 'pinned-bytes' > "$BATS_TEST_TMPDIR/pinned.img"
+  SUM="$(sha256sum "$BATS_TEST_TMPDIR/pinned.img" | awk '{print $1}')"
+  sed -i "s/^LK2ND_SHA256=.*/LK2ND_SHA256=$SUM/" "$BATS_TEST_TMPDIR/repo/devices/lk2nddev.env"
+  cp "$BATS_TEST_TMPDIR/pinned.img" "$DEBIANDROID_OUT/lk2nddev/lk2nd-msm8952.img"
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" DEBIANDROID_OUT="$DEBIANDROID_OUT" \
+      FASTBOOT_BIN=true "$REPO_ROOT/scripts/flash.sh" lk2nddev --flash-lk2nd --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"fastboot flash lk2nd"* ]]
+}

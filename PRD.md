@@ -11,7 +11,7 @@ debiandroid is a tooling repository (scripts and documentation) for installing a
 - **Redmi Note 4X (mido)**: Snapdragon 625 (MSM8953), eMMC (embedded MultiMediaCard) 32/64 GB, RAM 3/4 GB.
 - **Redmi 4X (santoni)**: Snapdragon 435 (MSM8937), eMMC 16/32 GB, RAM 2/3 GB.
 
-Intended use: pocket servers (SSH access, server packages, light containers). Not a desktop, not a daily-driver phone.
+Intended use: pocket servers (SSH access, server packages, light containers) and appliance panels: the phone screen shows one fullscreen web page, OpenWrt style. Not a desktop, not a daily-driver phone.
 
 ## 2. Problem
 
@@ -48,6 +48,8 @@ Intended use: pocket servers (SSH access, server packages, light containers). No
 - Build mainline/community kernels; assemble `boot.img` (kernel + DTB (Device Tree Blob) + initramfs).
 - `stock-repack` path: keep the vendor kernel and DTB byte for byte and replace only the initramfs. This is the first hardware milestone. Mainline follows on msm8953/msm8940 behind a second-stage bootloader (lk2nd), which has no msm8998 target.
 - Rootfs backend: Debian (debootstrap). Ubuntu and prebuilt images are deferred; the release pipeline ships Debian only.
+- Two bootloaders: stock aboot, or lk2nd for mainline on msm8953/msm8940. lk2nd is taken from a pinned upstream release, not built here.
+- Optional kiosk browser (`KIOSK=1`): cage plus Epiphany showing one URL on the panel.
 - Installation modes: dual-boot and dedicated.
 - TWRP (Team Win Recovery Project) zip installer, equivalent to flashing a custom ROM, plus a fastboot path.
 - GitHub Actions CI on `v*` tags: `boot.img`, rootfs per channel, `SHA256SUMS`, installer zip.
@@ -55,7 +57,7 @@ Intended use: pocket servers (SSH access, server packages, light containers). No
 - Documentation: PRD.md, README.md, AGENTS.md, docs/design.md, docs/validation.md.
 
 **Out of scope (non-goals)**
-- Desktop GUI, display manager, GPU acceleration.
+- Desktop session, window manager, or multi-window GUI. A single fullscreen browser kiosk is in scope and uses the GPU through freedreno.
 - Modem/cellular (SMS, calls, data), camera, full audio.
 - dreamlte (Exynos 8895) device.
 - Porting UEFI (edk2) as a prerequisite.
@@ -96,6 +98,8 @@ There is no application authentication. Access control is physical and operation
 | REQ-BOOT-006 | Save the stock boot and recovery images before any write | P0 |
 | REQ-BOOT-007 | Test-mode initramfs arms a dead-man timer and reboots instead of hanging | P1 |
 | REQ-SRV-001 | Mainline kernels enable the container prerequisites (namespaces, cgroups, overlayfs, veth, NAT); verified after the fragment merge | P1 |
+| REQ-BOOT-008 | `BOOTLOADER=lk2nd` uses the pinned upstream release image, verified by SHA-256 before flashing | P0 |
+| REQ-UI-001 | `KIOSK=1` installs a fullscreen browser (cage plus Epiphany) showing one configurable URL on the panel | P1 |
 | REQ-ROOT-001 | Debian rootfs backend via debootstrap | P0 |
 | REQ-ROOT-002 | Ubuntu base rootfs backend | Deferred (section 6) |
 | REQ-ROOT-003 | Prebuilt image backend (postmarketOS) plus server packages | Deferred (section 6) |
@@ -181,6 +185,11 @@ No database. Configuration is text files.
 
 ```text
 KERNEL_FLAVOR=mainline|stock-repack   # stock-repack builds no kernel at all
+BOOTLOADER=aboot|lk2nd                 # lk2nd required for mainline on msm8953/msm8940
+LK2ND_TARGET=                          # msm8952 for santoni, msm8953 for mido
+LK2ND_URL=                             # pinned upstream release asset
+LK2ND_SHA256=                          # 64 hex characters, checked before flashing
+KIOSK=0|1                              # 1 = fullscreen browser on the panel
 KERNEL_REPO=
 KERNEL_REF=
 KERNEL_COMMIT=
@@ -257,6 +266,8 @@ P0 verification matrix:
 | REQ-KRN-003 | wrong commit or checksum aborts before compile |
 | REQ-INST-004 | wrong PARTNAME or missing marker aborts before mount |
 | REQ-BOOT-005 | `verify-flash.sh` matches the image SHA-256 after a write |
+| REQ-BOOT-008 | `fetch-lk2nd.sh` verifies SHA-256; `flash.sh --flash-lk2nd` refuses a mismatched image |
+| REQ-UI-001 | kiosk unit active, the panel shows the configured URL |
 | REQ-NET-001 | `ip -br a` shows `wlan0` with an IP |
 | REQ-NET-002 | `ip -br a` shows `usb0` with an IP |
 | REQ-NET-003 | `ip -br a` shows `usb0` or `wlan0` with an IP on santoni |
@@ -355,7 +366,7 @@ FASTBOOT_BIN=fastboot
 ## 24. Acceptance Criteria and Definition of Done
 
 - santoni boots the vendor kernel with the debiandroid initramfs (`stock-repack`); then mido and santoni boot mainline behind lk2nd; sagit follows once its boot path is settled.
-- The Debian server installs and is reachable over SSH with no desktop.
+- The Debian server installs and is reachable over SSH with no desktop session; with `KIOSK=1` the panel shows the configured page.
 - Dual-boot preserves Android; dedicated mode works and is verified.
 - The TWRP zip installer installs from TWRP without a Linux host, in both modes.
 - A `v*` tag produces every release asset plus `SHA256SUMS`, and `fetch.sh --verify` rejects a bad checksum.

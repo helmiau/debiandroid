@@ -35,7 +35,9 @@ Read `PRD.md` and `docs/design.md` before touching code. Those documents are the
 - `rootfs/overlay/`: files baked into every rootfs, including the `debiandroid-health` systemd unit the dead-man timer needs.
 - `scripts/rootfs/*.sh`: build the rootfs per backend.
 - `scripts/install.sh`: installation orchestration for the selected `--mode`.
-- `scripts/flash.sh`: flash `boot` or `recovery`, with confirmation and a RAM-boot override.
+- `scripts/flash.sh`: flash `lk2nd`, `boot` or `recovery`, with confirmation and a RAM-boot override.
+- `scripts/fetch-lk2nd.sh`: download the pinned lk2nd release image and verify its SHA-256.
+- `rootfs/overlay/etc/systemd/system/debiandroid-kiosk.service`: opt-in fullscreen browser (`KIOSK=1`).
 - `scripts/verify-flash.sh`: read the partition back through adb and compare SHA-256.
 - `scripts/backup-stock.sh`: save the stock boot and recovery images before any write.
 
@@ -73,6 +75,8 @@ Behavior changes must update `PRD.md` and `docs/design.md` when they affect scop
 - Never claim a boot succeeded without evidence from the device: kernel log on the console plus network or SSH access.
 - Never flash a boot image that `verify-bootimg.py` rejects, or one with no initramfs.
 - Never ship `KERNEL_FLAVOR=stock-repack` claiming mainline features; it keeps the vendor kernel.
+- Never attribute networking behaviour to lk2nd: it is a bootloader with no network stack. Networking is kernel, firmware and userspace.
+- Never flash an lk2nd image whose SHA-256 does not match `devices/<codename>.env`.
 - Never build a stock kernel from Xiaomi's published tree expecting a device tree: `santoni-n-oss` has no `msm8937-santoni.dts`. The device image is the source of truth.
 - Never add device support outside scope without an owner decision.
 - Never silently switch the default mode (dual-boot) to dedicated.

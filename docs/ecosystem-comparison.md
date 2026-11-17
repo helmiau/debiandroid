@@ -50,8 +50,9 @@ artifacts.
 
 ## 4. Consequences for the plan
 
-1. Take `lk2nd` from postmarketOS's builds instead of building it: they already carry
-   device DTS for mido and santoni.
+1. Take `lk2nd` from the pinned upstream release instead of building it (decided
+   2026-11-17): 322 KiB for santoni (`msm8952`), 360 KiB for mido (`msm8953`), SHA-256
+   recorded in `devices/*.env`. The images already contain the device DTS.
 2. Take kernel fragments and firmware packages as the starting point, as already noted in
    `docs/klipperphones-comparison.md`.
 3. Drop sagit from the near-term matrix permanently rather than temporarily: upstream has

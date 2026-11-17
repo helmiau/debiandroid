@@ -31,6 +31,7 @@ while [ "$#" -gt 0 ]; do
     --ram-boot) MODE=ram ;;
     --flash-boot) MODE=boot ;;
     --flash-recovery) MODE=recovery ;;
+    --flash-lk2nd) MODE=lk2nd ;;
     --image) IMAGE="${2:-}"; shift ;;
     --allow-unproven) ALLOW_UNPROVEN=1 ;;
     --dry-run) DRY_RUN=1 ;;
@@ -42,10 +43,18 @@ done
 set -- "${ARGS[@]:-}"
 
 load_device "${1:-}"
-[ -n "$MODE" ] || usage_die "choose a target: --ram-boot, --flash-boot, or --flash-recovery"
+[ -n "$MODE" ] || usage_die "choose a target: --ram-boot, --flash-boot, --flash-recovery, or --flash-lk2nd"
 
-IMG="${IMAGE:-$OUT_DIR/$DEVICE/boot-$DEVICE.img}"
-[ -f "$IMG" ] || die "boot image not built: $IMG (run scripts/make-bootimg.sh $DEVICE)"
+if [ "$MODE" = "lk2nd" ]; then
+  IMG="${IMAGE:-$OUT_DIR/$DEVICE/lk2nd-$LK2ND_TARGET.img}"
+  [ -f "$IMG" ] || die "lk2nd image missing: $IMG (run scripts/fetch-lk2nd.sh $DEVICE)"
+  GOT="$(sha256sum "$IMG" | awk '{print $1}')"
+  [ "$GOT" = "$LK2ND_SHA256" ] \
+    || die "refusing to flash an lk2nd image whose SHA-256 differs from devices/$DEVICE.env"
+else
+  IMG="${IMAGE:-$OUT_DIR/$DEVICE/boot-$DEVICE.img}"
+  [ -f "$IMG" ] || die "boot image not built: $IMG (run scripts/make-bootimg.sh $DEVICE)"
+fi
 require_fastboot
 
 case "$MODE" in
@@ -57,6 +66,15 @@ case "$MODE" in
     fi
     info "RAM boot (no storage writes): $IMG"
     run "$FASTBOOT_BIN" boot "$IMG"
+    ;;
+  lk2nd)
+    warn "This writes the lk2nd second-stage bootloader for $LK2ND_TARGET to $DEVICE."
+    warn "After it, 'boot' is written at a 512 KiB offset and holds the kernel; Android's"
+    warn "stock boot path is replaced. Restore source: out/$DEVICE/stock/boot-stock-$DEVICE.img"
+    confirm "Flash $LK2ND_TARGET lk2nd to $DEVICE?"
+    run "$FASTBOOT_BIN" flash lk2nd "$IMG"
+    info "wrote lk2nd; the device now boots lk2nd, which exposes 'boot' at the offset"
+    info "next: scripts/flash.sh $DEVICE --flash-recovery --image <test image>"
     ;;
   boot|recovery)
     warn "This overwrites partition '$MODE' on $DEVICE."
