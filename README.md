@@ -158,5 +158,6 @@ Bootloader Interface missing" case: [docs/troubleshooting.md](docs/troubleshooti
 | `docs/design.md` | Architecture, boot chain, phases, risks |
 | `docs/validation.md` | What is proven vs not proven, per release |
 | `docs/troubleshooting.md` | Recovery mode, fastboot, and Windows driver fixes |
+| `docs/a51-comparison.md` | Cross-project analysis of a51-server-os and the changes it implies |
 | `AGENTS.md` | Working rules for coding agents |
 | `LICENSES/README.md` | License map per directory |
