@@ -83,11 +83,10 @@ a shell on the USB serial console instead of hanging silently.
 
 `scripts/initramfs/build.sh <codename> --mode prod|test` assembles the archive with
 `scripts/lib/mkcpio.py` (a cpio newc writer in Python, so no `cpio` binary is needed on
-the host). Rootfs backends:
-
-- `debian.sh`: `debootstrap --arch=arm64` plus base server packages.
-- `ubuntu.sh`: `ubuntu-base` arm64 as the base.
-- `prebuilt.sh`: ready image plus server packages.
+the host). Rootfs backend: `debian.sh` (`debootstrap --arch=arm64` plus base server packages).
+Ubuntu and prebuilt images are deferred; supporting one distribution end to end is
+cheaper than three half-verified ones, and `fetch.sh` rejects their backend names so no
+release advertises an asset that is not built.
 
 ## 4. Installation modes
 
@@ -130,7 +129,7 @@ the host). Rootfs backends:
 
 1. No UEFI: direct fastboot path.
 2. Initial devices: santoni (hardware on hand), then mido and sagit.
-3. Selectable rootfs backend: Debian, Ubuntu, or a prebuilt image.
+3. One rootfs backend: Debian. Ubuntu and prebuilt images stay deferred until the Debian path is verified on hardware.
 4. Both dual-boot and dedicated modes are provided and chosen at install time.
 
 ## 9. Artifact distribution and CI
@@ -143,11 +142,9 @@ flowchart LR
     W --> K1[build boot-mido.img]
     W --> K2[build boot-sagit.img]
     W --> R1[rootfs debian snapshot/stable]
-    W --> R2[rootfs ubuntu snapshot/stable]
     K1 --> Z[zip installer + SHA256SUMS]
     K2 --> Z
     R1 --> Z
-    R2 --> Z
     Z --> G[GitHub Release]
     G --> F[fetch.sh --verify]
 ```

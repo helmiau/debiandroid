@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # Download a release asset and verify its SHA-256 before use.
-# Usage: fetch.sh --backend debian|ubuntu|prebuilt --channel snapshot|stable
+# Usage: fetch.sh --backend debian --channel snapshot|stable
 #                 [--tag v0.1.0] [--repo owner/name] [--verify|--no-verify] [--dry-run]
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,7 +30,14 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-case "$BACKEND" in debian|ubuntu|prebuilt) ;; *) usage_die "--backend must be debian, ubuntu, or prebuilt" ;; esac
+# Debian only for now. Ubuntu and prebuilt images are deferred (PRD section 6,
+# future considerations); keeping them accepted here would advertise assets that
+# no workflow produces.
+case "$BACKEND" in
+  debian) ;;
+  ubuntu|prebuilt) die "--backend $BACKEND is deferred; only debian is built. See PRD section 6" 2 ;;
+  *) usage_die "--backend must be debian" ;;
+esac
 case "$CHANNEL" in snapshot|stable) ;; *) usage_die "--channel must be snapshot or stable" ;; esac
 if [ -z "$TAG" ]; then
   if [ "$DRY_RUN" = "1" ]; then

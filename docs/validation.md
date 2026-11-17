@@ -159,6 +159,7 @@ Authoring host: Windows 10, Git bash, Python 3.14, shellcheck 0.10.0. No device 
 | fragment verification | `kconfig-check.sh` on a merged config | PASS: missing symbol and y-to-m downgrade both rejected with exit 3 |
 
 Note: local runs need `PATH` pointed at a real bash; on Windows the `bash` on PATH is the WSL
-launcher. CI does not run the suite, so this was executed manually.
+launcher. CI runs the suite only in `release.yml` (on `santoni`, tag or manual dispatch),
+so day-to-day it was executed manually.
 Not validated: any real device (no handset connected), a real ARM64 busybox payload, and
 `verify-flash.sh` against a phone (needs Android with root and adb).

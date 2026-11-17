@@ -1,6 +1,6 @@
 # debiandroid
 
-Install a headless **Debian/Ubuntu server** on top of a **mainline ARM64 Linux kernel** on Android phones that never shipped UEFI.
+Install a headless **Debian server** on top of a **mainline ARM64 Linux kernel** on Android phones that never shipped UEFI.
 
 Built for pocket servers: SSH, server packages, light containers. Not a desktop.
 
@@ -64,9 +64,7 @@ ssh debian@<device-ip>
 ## Choose a rootfs backend
 
 ```bash
-./scripts/rootfs/debian.sh   # Debian arm64, debootstrap
-./scripts/rootfs/ubuntu.sh   # Ubuntu base arm64
-./scripts/rootfs/prebuilt.sh # prebuilt image (e.g. postmarketOS) plus server packages
+./scripts/rootfs/debian.sh   # Debian arm64, debootstrap (the only backend for now)
 ```
 
 ## Install via TWRP (no Linux host)
@@ -92,7 +90,7 @@ CI runs only on `v*` tags. Assets per release:
 
 ```text
 boot-mido.img  boot-sagit.img
-rootfs-{debian,ubuntu}-arm64-{snapshot,stable}-<tag>.tar.zst
+rootfs-debian-arm64-{snapshot,stable}-<tag>.tar.zst
 installer-debiandroid-<tag>.zip
 SHA256SUMS
 ```
@@ -107,7 +105,7 @@ The `snapshot` channel is reproducible; `stable` uses the latest packages at rel
 ./scripts/flash.sh <codename> [--ram-boot|--flash-boot|--flash-recovery] [--image FILE]
 ./scripts/rootfs/debian.sh <codename> [--mode dual-boot|dedicated] [--size 4G]
 ./scripts/install.sh <codename> --mode dual-boot|dedicated
-./scripts/fetch.sh --backend debian|ubuntu|prebuilt --channel snapshot|stable --verify
+./scripts/fetch.sh --backend debian --channel snapshot|stable --verify
 ```
 
 Every command accepts `--dry-run`.
@@ -136,7 +134,7 @@ debiandroid/
 │   ├── install.sh
 │   ├── fetch.sh
 │   ├── initramfs/
-│   └── rootfs/{debian,ubuntu,prebuilt}.sh
+│   └── rootfs/debian.sh
 ├── installer/        # TWRP zip payload and update-binary
 └── tests/
 ```
@@ -171,5 +169,6 @@ Bootloader Interface missing" case: [docs/troubleshooting.md](docs/troubleshooti
 | `docs/a51-comparison.md` | Cross-project analysis of a51-server-os and the changes it implies |
 | `docs/klipperphones-comparison.md` | KlipperPhonesLinux: lk2nd + mainline on mido/santoni, reusable configs, and its gaps |
 | `docs/docker-on-android-comparison.md` | Container kernel prerequisites, and which Android workarounds we do not need |
+| `docs/ecosystem-comparison.md` | postmarketOS status on santoni, mido and sagit, and what this project should not duplicate |
 | `AGENTS.md` | Working rules for coding agents |
 | `LICENSES/README.md` | License map per directory |

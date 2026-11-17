@@ -5,7 +5,7 @@ Version 0.1 (draft) | 2026-11-16 | Status: Draft
 
 ## 1. Overview
 
-debiandroid is a tooling repository (scripts and documentation) for installing a headless **Debian/Ubuntu server** on top of a **mainline ARM64 Linux kernel** on Android phones that never shipped UEFI (Unified Extensible Firmware Interface):
+debiandroid is a tooling repository (scripts and documentation) for installing a headless **Debian server** on top of a **mainline ARM64 Linux kernel** on Android phones that never shipped UEFI (Unified Extensible Firmware Interface):
 
 - **Xiaomi Mi6 (sagit)**: Snapdragon 835 (MSM8998), UFS (Universal Flash Storage) 64/128 GB, RAM (Random Access Memory) 4/6 GB.
 - **Redmi Note 4X (mido)**: Snapdragon 625 (MSM8953), eMMC (embedded MultiMediaCard) 32/64 GB, RAM 3/4 GB.
@@ -23,7 +23,7 @@ Intended use: pocket servers (SSH access, server packages, light containers). No
 ## 3. Product Goals
 
 - **G1**: Boot an ARM64 mainline Linux kernel directly through fastboot, without UEFI.
-- **G2**: Install a selectable server root filesystem: Debian, Ubuntu, or a prebuilt image.
+- **G2**: Install a Debian arm64 server root filesystem (other distributions are deferred, see section 6).
 - **G3**: Provide two installation modes: dual-boot (Android preserved) and dedicated (all storage for the server).
 - **G4**: Reproducible: one command per stage, per-device configuration in a single file.
 
@@ -47,7 +47,7 @@ Intended use: pocket servers (SSH access, server packages, light containers). No
 - Kernel and boot image support for santoni, mido, and sagit.
 - Build mainline/community kernels; assemble `boot.img` (kernel + DTB (Device Tree Blob) + initramfs).
 - `stock-repack` path: keep the vendor kernel and DTB byte for byte and replace only the initramfs. This is the first hardware milestone. Mainline follows on msm8953/msm8940 behind a second-stage bootloader (lk2nd), which has no msm8998 target.
-- Rootfs backends: Debian (debootstrap), Ubuntu (ubuntu-base), prebuilt image (postmarketOS).
+- Rootfs backend: Debian (debootstrap). Ubuntu and prebuilt images are deferred; the release pipeline ships Debian only.
 - Installation modes: dual-boot and dedicated.
 - TWRP (Team Win Recovery Project) zip installer, equivalent to flashing a custom ROM, plus a fastboot path.
 - GitHub Actions CI on `v*` tags: `boot.img`, rootfs per channel, `SHA256SUMS`, installer zip.
@@ -62,6 +62,7 @@ Intended use: pocket servers (SSH access, server packages, light containers). No
 
 **Future considerations**
 - Support for dreamlte and optional edk2-msm8998 UEFI on sagit.
+- Ubuntu (ubuntu-base) and prebuilt (postmarketOS) rootfs backends, deferred until the Debian path is verified on hardware.
 - Pre-flashed integrated images per release.
 - Interactive CLI/panel for distro selection.
 
@@ -96,8 +97,8 @@ There is no application authentication. Access control is physical and operation
 | REQ-BOOT-007 | Test-mode initramfs arms a dead-man timer and reboots instead of hanging | P1 |
 | REQ-SRV-001 | Mainline kernels enable the container prerequisites (namespaces, cgroups, overlayfs, veth, NAT); verified after the fragment merge | P1 |
 | REQ-ROOT-001 | Debian rootfs backend via debootstrap | P0 |
-| REQ-ROOT-002 | Ubuntu base rootfs backend | P1 |
-| REQ-ROOT-003 | Prebuilt image backend (postmarketOS) plus server packages | P1 |
+| REQ-ROOT-002 | Ubuntu base rootfs backend | Deferred (section 6) |
+| REQ-ROOT-003 | Prebuilt image backend (postmarketOS) plus server packages | Deferred (section 6) |
 | REQ-INST-001 | Dual-boot mode: rootfs in a directory on the data partition (`/data/debian-server/rootfs`), no loop device | P0 |
 | REQ-INST-002 | Dedicated mode: dedicated ext4 root partition | P1 |
 | REQ-INST-003 | TWRP zip installer: flashed from TWRP, equivalent to a custom ROM | P0 |
@@ -168,7 +169,7 @@ Details in `docs/design.md`. Summary:
 | Scripting | Bash 5.3 | Available on the host, no extra dependency |
 | Cross compiler | `aarch64-linux-gnu-gcc` | Standard ARM64 build |
 | Boot image | `mkbootimg` + `dtbtool` | Android boot image format |
-| Rootfs | `debootstrap`, `ubuntu-base`, tar images | No emulator required |
+| Rootfs | `debootstrap`, tar images | No emulator required |
 | Lint/test | `shellcheck`, `bats-core` | Lightweight, no heavy framework |
 | Transfer | `fastboot` | Official device boot path |
 
@@ -300,7 +301,7 @@ config/device.env
 GitHub Actions CI:
 
 - Trigger: `v*` tags and manual `workflow_dispatch` only. No nightly or scheduled runs.
-- Matrix: `backend` (debian, ubuntu) x `channel` (snapshot, stable) for rootfs; `codename` (mido, sagit) for `boot.img`.
+- Matrix: `channel` (snapshot, stable) for the Debian rootfs; `codename` (mido, sagit) for `boot.img`.
 - x86_64 runners with `aarch64-linux-gnu-gcc` cross-compilation; rootfs from official base images plus `qemu-user-static`, with the snapshot channel pinned via `snapshot.debian.org`.
 
 Assets per release:
@@ -310,8 +311,8 @@ boot-mido.img
 boot-sagit.img
 rootfs-debian-arm64-snapshot-<tag>.tar.zst
 rootfs-debian-arm64-stable-<tag>.tar.zst
-rootfs-ubuntu-arm64-snapshot-<tag>.tar.zst
-rootfs-ubuntu-arm64-stable-<tag>.tar.zst
+rootfs-debian-arm64-snapshot-<tag>.tar.zst
+rootfs-debian-arm64-stable-<tag>.tar.zst
 installer-debiandroid-<tag>.zip
 SHA256SUMS
 ```
@@ -347,18 +348,18 @@ FASTBOOT_BIN=fastboot
 | P2 (done) | Build pipeline, structural verification, `stock-repack` flavor, initramfs with rescue console and dead-man timer | 37/37 tests green; artifacts verified structurally; no device boot yet |
 | P3 | Hardware proof on santoni with the vendor kernel: backup, initramfs, repack, recovery flash, read-back | `verify-flash.sh` reports a match; SSH or the rescue console answers |
 | P4 | lk2nd + mainline on santoni, then mido (lk2nd has targets for both) | kernel 6.x boots; `findmnt /` shows the expected root; SSH over `usb0` |
-| P5 | Containers on the mainline build; Ubuntu and prebuilt backends; dedicated mode | `docker run --rm hello-world`; all backends and both modes pass |
+| P5 | Containers on the mainline build; dedicated mode | `docker run --rm hello-world`; both installation modes pass |
 | P6 | sagit on aboot mainline (lk2nd has no msm8998 target); dreamlte stays out of scope | SSH on sagit, or a documented blocker |
 | P7 | TWRP zip installer, `v*` release workflow, CI test job | tag `v0.1.0` produces 9 assets + `SHA256SUMS`; CI runs shellcheck and bats |
 
 ## 24. Acceptance Criteria and Definition of Done
 
 - santoni boots the vendor kernel with the debiandroid initramfs (`stock-repack`); then mido and santoni boot mainline behind lk2nd; sagit follows once its boot path is settled.
-- Debian/Ubuntu server installs and is reachable over SSH with no desktop.
+- The Debian server installs and is reachable over SSH with no desktop.
 - Dual-boot preserves Android; dedicated mode works and is verified.
 - The TWRP zip installer installs from TWRP without a Linux host, in both modes.
 - A `v*` tag produces every release asset plus `SHA256SUMS`, and `fetch.sh --verify` rejects a bad checksum.
-- All three rootfs backends run at least on one device.
+- The Debian rootfs runs on at least one device; other backends stay deferred.
 - Preflight prevents destructive steps when conditions are unsafe.
 - `shellcheck` and `bats` are green; the P0 verification matrix passes.
 - Documentation is accurate against the code.

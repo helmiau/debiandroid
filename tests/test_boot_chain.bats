@@ -128,3 +128,15 @@ PYEOF
   [ "$status" -eq 3 ]
   [[ "$output" == *"requested CONFIG_OVERLAY_FS=y"* ]]
 }
+
+@test "fetch refuses a deferred rootfs backend" {
+  run "$REPO_ROOT/scripts/fetch.sh" --backend ubuntu --channel stable --dry-run
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"deferred"* ]]
+}
+
+@test "fetch still accepts debian" {
+  run "$REPO_ROOT/scripts/fetch.sh" --backend debian --channel stable --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"rootfs-debian-arm64-stable"* ]]
+}
