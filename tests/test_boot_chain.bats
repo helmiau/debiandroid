@@ -204,3 +204,48 @@ ENV
   [ "$status" -eq 0 ]
   [[ "$output" == *"fastboot flash lk2nd"* ]]
 }
+
+make_cloudflared_env() {
+  cat > "$BATS_TEST_TMPDIR/repo/devices/cfdev.env" <<'ENV'
+DEVICE=cfdev
+SOC=msm8953
+KERNEL_FLAVOR=mainline
+BOOTLOADER=aboot
+KERNEL_REPO=local
+KERNEL_REF=main
+DEFCONFIG=msm8953_defconfig
+DTB_NAME=qcom/x.dtb
+BOOTIMG_PAGESIZE=2048
+BOOTIMG_BASE=0x80000000
+CMDLINE="console=ttyMSM0"
+NET_MODE=wlan0
+ROOT_PARTNAME_EXPECTED=userdata
+ROOT_MARKER=/etc/debiandroid-root
+MIN_FREE_GB=4
+KIOSK=0
+CLOUDFLARED=1
+ENV
+}
+
+@test "debian.sh dry-run downloads cloudflared when CLOUDFLARED=1" {
+  make_cloudflared_env
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" DEBIANDROID_CACHE="$DEBIANDROID_CACHE" \
+      DEBIANDROID_OUT="$DEBIANDROID_OUT" CLOUDFLARED=1 \
+      "$REPO_ROOT/scripts/rootfs/debian.sh" cfdev --dry-run
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"cloudflared"* ]]
+  [[ "$output" == *"cloudflared-linux-arm64"* ]]
+}
+
+@test "debian.sh dry-run skips cloudflared when CLOUDFLARED=0" {
+  make_cloudflared_env
+  sed -i 's/^CLOUDFLARED=1$/CLOUDFLARED=0/' "$BATS_TEST_TMPDIR/repo/devices/cfdev.env"
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  printf '#!/bin/sh\necho "debootstrap stub"\n' > "$BATS_TEST_TMPDIR/bin/debootstrap"
+  chmod +x "$BATS_TEST_TMPDIR/bin/debootstrap"
+  run env PATH="$BATS_TEST_TMPDIR/bin:$PATH" DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" \
+      DEBIANDROID_CACHE="$DEBIANDROID_CACHE" DEBIANDROID_OUT="$DEBIANDROID_OUT" \
+      "$REPO_ROOT/scripts/rootfs/debian.sh" cfdev --dry-run
+  [ "$status" -eq 0 ]
+  [[ ! "$output" == *"cloudflared"* ]]
+}

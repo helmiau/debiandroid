@@ -1,0 +1,4 @@
+# Cloudflare Tunnel configuration for debiandroid.
+# Set CLOUDFLARED_TOKEN to a tunnel token from https://dash.cloudflare.com/.
+# Without a token the service does nothing.
+CLOUDFLARED_TOKEN=

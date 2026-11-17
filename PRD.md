@@ -52,6 +52,7 @@ The panel is optional. With `KIOSK=0` (default) nothing draws to it; the device 
 - Rootfs backend: Debian (debootstrap). Ubuntu and prebuilt images are deferred; the release pipeline ships Debian only.
 - Two bootloaders: stock aboot, or lk2nd for mainline on msm8953/msm8940. lk2nd is taken from a pinned upstream release, not built here.
 - Optional kiosk browser (`KIOSK=1`, off by default): cage plus Epiphany showing one configurable URL on the panel.
+- Optional Cloudflare Tunnel (`CLOUDFLARED=1`, off by default): cloudflared as a systemd service, token configured in the image; off because it exposes admin surfaces to the internet.
 - Installation modes: dual-boot and dedicated.
 - TWRP (Team Win Recovery Project) zip installer, equivalent to flashing a custom ROM, plus a fastboot path.
 - GitHub Actions CI on `v*` tags: `boot.img`, rootfs per channel, `SHA256SUMS`, installer zip.
@@ -192,6 +193,7 @@ LK2ND_TARGET=                          # msm8952 for santoni, msm8953 for mido
 LK2ND_URL=                             # pinned upstream release asset
 LK2ND_SHA256=                          # 64 hex characters, checked before flashing
 KIOSK=0|1                              # 1 = fullscreen browser on the panel (opt-in, default 0)
+CLOUDFLARED=0|1                       # 1 = Cloudflare Tunnel (opt-in, default 0)
 KERNEL_REPO=
 KERNEL_REF=
 KERNEL_COMMIT=
@@ -270,6 +272,8 @@ P0 verification matrix:
 | REQ-BOOT-005 | `verify-flash.sh` matches the image SHA-256 after a write |
 | REQ-BOOT-008 | `fetch-lk2nd.sh` verifies SHA-256; `flash.sh --flash-lk2nd` refuses a mismatched image |
 | REQ-UI-001 | kiosk unit active, the panel shows the configured URL (`KIOSK=1` opt-in; default off) |
+| REQ-NET-004 | `CLOUDFLARED=1` installs cloudflared and enables the service; the token comes from `/etc/default/debiandroid-cloudflared` | P1 |
+| REQ-NET-005 | Wi-Fi client (`wlan0`) works with wpa_supplicant and the device firmware; SSID configured in the image | P0 |
 | REQ-NET-001 | `ip -br a` shows `wlan0` with an IP |
 | REQ-NET-002 | `ip -br a` shows `usb0` with an IP |
 | REQ-NET-003 | `ip -br a` shows `usb0` or `wlan0` with an IP on santoni |

@@ -1,0 +1,16 @@
+[Unit]
+Description=Cloudflare Tunnel for debiadmin
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/usr/local/bin/cloudflared
+ConditionPathExists=/etc/default/debiandroid-cloudflared
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/debiandroid-cloudflared
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
