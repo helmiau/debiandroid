@@ -53,6 +53,23 @@ Record device, firmware, panel variant, commit, and image hash for each run.
 - Sustained multi-day operation.
 - Recovery from a failed flash (procedure documented, not exercised).
 
+## P4 mainline build (2026-11-17)
+CI run `44107614985`, commit `d86bbb1`, GitHub Actions `ubuntu-24.04`.
+
+| Check | Result |
+|---|---|
+| msm89x7-mainline 6.6 (`ffe6e7e`) compiled for santoni | PASS: `Image.gz` 13.1 MB, `msm8940-xiaomi-santoni.dtb` 43.6 KB |
+| boot.img built with the initramfs | PASS: kernel 13,739,447 B, ramdisk 660,168 B (gzip), page 2048 |
+| `verify-bootimg.py` on the CI artifact | PASS |
+| RAM boot via lk2nd (`fastboot boot`) | `Booting` OKAY, then the device drops to EDL (QHSUSB VID 05C6 PID 900E) |
+| stock Android (Nusantara) boot via lk2nd | PASS: full Android boots, confirming lk2nd itself works |
+| stock-repack boot via lk2nd | FAIL: device drops to EDL |
+
+Reading: lk2nd works (a stock image boots through it), but both the vendor kernel with
+our initramfs and the mainline kernel end in EDL. The common factor is the initramfs, so
+the next diagnostic is a serial console (earlycon on ttyMSM0) or `pstore` after a
+reboot; without one of those every further boot attempt is a guess.
+
 ## Reporting
 
 File hardware results with the issue template. Redact identifiers. Attach the image hash and the exact commands used.
