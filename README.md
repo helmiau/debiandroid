@@ -49,6 +49,12 @@ cp devices/santoni.env.example devices/santoni.env
 # 6. Install the server rootfs (choose a backend)
 ./scripts/rootfs/debian.sh santoni --mode dual-boot
 ./scripts/install.sh santoni --mode dual-boot
+
+# Optional: fullscreen browser kiosk on the panel (off by default)
+# Edit devices/santoni.env: KIOSK=1, then KIOSK_URL in /etc/debiandroid/kiosk.conf
+# Optional: Cloudflare Tunnel for remote access (off by default)
+# Edit devices/santoni.env: CLOUDFLARED=1, then set CLOUDFLARED_TOKEN in
+# /etc/default/debiandroid-cloudflared inside the rootfs (token from the Cloudflare dashboard).
 ```
 
 After reboot, connect over SSH:
