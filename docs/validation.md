@@ -141,3 +141,22 @@ Attempted `fastboot boot` on santoni. Not completed.
 Cause: Windows has no Google USB Driver installed, so the bootloader interface is unbound. Procedure documented in `docs/troubleshooting.md`.
 
 Consequence: no on-device boot has been performed for any device. All P2 claims remain build-and-artifact only.
+
+## P3 boot-chain tooling (2026-11-17)
+Authoring host: Windows 10, Git bash, Python 3.14, shellcheck 0.10.0. No device attached.
+
+| Check | Command | Result |
+|---|---|---|
+| cpio writer | `mkcpio.py <dir> <out> --gzip` then `--list` | PASS: `/init` 0755, `/dev/console` c 0600, `/dev/null` c 0666 |
+| boot image layout | `bootimg_v0.py selfcheck` | PASS: byte-identical round trip, ramdisk replacement |
+| stock repack, end to end | `repack-stock.sh zzfake --stock-boot <synthetic> --initramfs <cpio.gz>` | PASS: kernel 6002 B unchanged, ramdisk replaced, `verify-bootimg.py` OK |
+| initramfs build | `initramfs/build.sh zzfake --busybox <arm64> --mode test` | PASS: mode 0755, `/debiandroid.conf` embeds `DEBIANDROID_MODE=test`, `DEADMAN_SECONDS=180` |
+| flash target guard | `flash.sh <dev> --ram-boot --dry-run` | PASS (exit 1, refuses without `--allow-unproven`) |
+| flash recovery dry-run | `flash.sh <dev> --flash-recovery --dry-run` | PASS |
+| shellcheck, new scripts | `shellcheck -x` on LF copies | PASS for the new files; SC1091/SC2034 findings are pre-existing |
+| bats suite | `bats tests/test_config.bats tests/test_boot_chain.bats` | PASS 34/34 (27 config + 7 boot chain) |
+
+Note: local runs need `PATH` pointed at a real bash; on Windows the `bash` on PATH is the WSL
+launcher. CI does not run the suite, so this was executed manually.
+Not validated: any real device (no handset connected), a real ARM64 busybox payload, and
+`verify-flash.sh` against a phone (needs Android with root and adb).

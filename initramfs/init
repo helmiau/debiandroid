@@ -1,0 +1,186 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# debiandroid /init -- first process in the initramfs (PID 1).
+#
+# Boot flow: mount pseudo filesystems -> USB rescue console -> find userdata ->
+# switch_root into the Debian rootfs -> hand PID 1 to runit (or /sbin/init).
+#
+# Safety rules learned from a51-server-os (see docs/a51-comparison.md):
+#   * hung_task_panic is disabled: vendor kernels panic when a task blocks, and
+#     without Android's daemons some threads block forever.
+#   * a stale boot-recovery message in the misc partition is cleared, otherwise
+#     every reboot returns to the recovery loop.
+#   * test mode arms a dead-man timer: if the system does not report healthy in
+#     DEADMAN_SECONDS, the device reboots back to Android instead of hanging.
+#   * any failure drops to a shell on the USB serial console, never a silent hang.
+#
+# Environment (set at build time by scripts/initramfs/build.sh):
+#   DEBIANDROID_MODE     prod | test
+#   DEBIANDROID_DATA_DIR debian-server (directory on userdata)
+#   DEADMAN_SECONDS      300
+#   HEALTH_STAMP_DIR     /var/log/debiandroid
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+
+# Build-time configuration (written by scripts/initramfs/build.sh).
+[ -r /debiandroid.conf ] && . /debiandroid.conf
+
+MODE="${DEBIANDROID_MODE:-prod}"
+DATA_DIR="${DEBIANDROID_DATA_DIR:-debian-server}"
+DEADMAN_SECONDS="${DEADMAN_SECONDS:-300}"
+HEALTH_DIR="${HEALTH_STAMP_DIR:-/var/log/debiandroid}"
+CONSOLE=/dev/ttyGS0
+
+log() { echo "debiandroid-init: $*" | tee -a /dev/kmsg 2>/dev/null || echo "debiandroid-init: $*"; }
+
+rescue() {
+  log "RESCUE: $*"
+  echo "debiandroid-init RESCUE: $*"
+  while true; do
+    if [ -e "$CONSOLE" ]; then
+      setsid sh -c 'exec cttyhack sh' <"$CONSOLE" >"$CONSOLE" 2>&1
+    fi
+    sleep 2
+  done
+}
+
+# --- 1. pseudo filesystems -----------------------------------------------------
+mkdir -p /proc /sys /dev /dev/pts /mnt /newroot
+mount -t proc proc /proc      || rescue "cannot mount /proc"
+mount -t sysfs sysfs /sys     || rescue "cannot mount /sys"
+mount -t devtmpfs devtmpfs /dev 2>/dev/null || mount -t tmpfs tmpfs /dev
+mkdir -p /dev/pts && mount -t devpts devpts /dev/pts 2>/dev/null
+
+# Vendor kernels panic on any task blocked for ~120s. Without Android the
+# TrustZone threads wait forever, so this must be cleared before anything else.
+echo 0 > /proc/sys/kernel/hung_task_panic 2>/dev/null
+
+part() {
+  for u in /sys/class/block/*/uevent; do
+    grep -qx "PARTNAME=$1" "$u" && { sed -n 's/^DEVNAME=//p' "$u"; return 0; }
+  done
+  return 1
+}
+blockdev_of() { # blockdev_of <partition-name>
+  local d
+  d="$(part "$1")" || return 1
+  [ -n "$d" ] && echo "/dev/$d"
+}
+
+clear_bcb() { # Android's "boot-recovery" message traps the device in recovery
+  local m
+  m="$(blockdev_of misc)" || return 0
+  [ -b "$m" ] || return 0
+  if [ "$(dd if="$m" bs=13 count=1 2>/dev/null)" = "boot-recovery" ]; then
+    dd if=/dev/zero of="$m" bs=32 count=1 conv=notrunc,fsync 2>/dev/null \
+      && log "cleared boot-recovery in $m"
+  fi
+}
+
+# --- 2. USB rescue console (ACM serial + NCM network) --------------------------
+usb_gadget() {
+  local g=/sys/kernel/config/usb_gadget/g1 udc n=0
+  mount -t configfs configfs /sys/kernel/config 2>/dev/null
+  [ -d "$g" ] || mkdir -p "$g" 2>/dev/null || return 1
+  mkdir -p "$g/strings/0x409" "$g/configs/c.1/strings/0x409" \
+           "$g/functions/acm.usb0" "$g/functions/ncm.usb0" 2>/dev/null
+  echo 0x1d6b > "$g/idVendor"
+  echo 0x0104 > "$g/idProduct"
+  echo 0x0200 > "$g/bcdUSB"
+  echo "debiandroid" > "$g/strings/0x409/serialnumber"
+  echo "debiandroid" > "$g/strings/0x409/manufacturer"
+  echo "debiandroid server" > "$g/strings/0x409/product"
+  echo "Conf 1" > "$g/configs/c.1/strings/0x409/configuration"
+  echo 500 > "$g/configs/c.1/MaxPower"
+  [ -e "$g/configs/c.1/acm.usb0" ] || ln -s "$g/functions/acm.usb0" "$g/configs/c.1/" 2>/dev/null
+  [ -e "$g/configs/c.1/ncm.usb0" ] || ln -s "$g/functions/ncm.usb0" "$g/configs/c.1/" 2>/dev/null
+  udc="$(ls /sys/class/udc 2>/dev/null | head -n1)"
+  [ -n "$udc" ] || return 1
+  # The controller may only appear after the connector detects the cable.
+  while [ "$n" -lt 25 ]; do
+    if echo "$udc" > "$g/UDC" 2>/dev/null; then
+      log "USB gadget bound to $udc after ${n}s"
+      return 0
+    fi
+    n=$((n + 1)); sleep 1
+  done
+  return 1
+}
+usb_gadget || log "USB gadget unavailable; continuing without rescue console"
+
+# --- 3. locate and mount the root filesystem ----------------------------------
+# Two layouts, chosen by what exists on the device:
+#   dedicated  a partition named "debiandroid" holds the root filesystem directly
+#   dual-boot  the rootfs lives in <userdata>/debian-server/rootfs
+clear_bcb
+
+DED=""
+i=0
+while [ "$i" -lt 10 ]; do
+  DED="$(blockdev_of debiandroid)" && [ -b "$DED" ] && break
+  DED=""; i=$((i + 1)); sleep 1
+done
+
+if [ -n "$DED" ]; then
+  log "dedicated root partition $DED"
+  mount -t ext4 -o noatime "$DED" /mnt || rescue "cannot mount $DED"
+  BASE=/mnt
+  ROOT=/mnt
+else
+  DATA=""
+  i=0
+  while [ "$i" -lt 30 ]; do
+    DATA="$(blockdev_of userdata)" && [ -b "$DATA" ] && break
+    DATA=""; i=$((i + 1)); sleep 1
+  done
+  [ -n "$DATA" ] || rescue "neither a debiandroid partition nor userdata was found"
+  log "userdata = $DATA"
+  mount -t f2fs -o noatime "$DATA" /mnt 2>/dev/null \
+    || mount -t ext4 -o noatime "$DATA" /mnt 2>/dev/null \
+    || rescue "cannot mount $DATA"
+  log "mounted $DATA on /mnt"
+  BASE=/mnt/$DATA_DIR
+  ROOT=$BASE/rootfs
+fi
+LOGF=$BASE/boot-native.log
+{
+  echo "=== native boot $(date 2>/dev/null) kernel $(uname -r) mode $MODE"
+  echo "userdata=$DATA udc=$(ls /sys/class/udc 2>/dev/null | tr '\n' ' ')"
+} >> "$LOGF" 2>/dev/null
+dmesg > "$BASE/boot-native-dmesg-initramfs.txt" 2>/dev/null
+
+[ -d "$ROOT" ] || rescue "rootfs missing at $ROOT (run scripts/install.sh)"
+if [ -x "$ROOT/usr/sbin/runit" ]; then
+  INIT_CMD=/usr/sbin/runit
+elif [ -x "$ROOT/sbin/init" ]; then
+  INIT_CMD=/sbin/init
+else
+  rescue "no runit and no /sbin/init in $ROOT"
+fi
+
+# --- 4. dead-man timer (test mode only) ---------------------------------------
+if [ "$MODE" = "test" ]; then
+  BID="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"
+  log "test mode: dead-man timer ${DEADMAN_SECONDS}s (boot_id=$BID)"
+  (
+    sleep "$DEADMAN_SECONDS"
+    if [ ! -f "$ROOT$HEALTH_DIR/healthy-$BID" ]; then
+      echo "deadman: no healthy-$BID after ${DEADMAN_SECONDS}s; rebooting" >> "$LOGF" 2>/dev/null
+      clear_bcb
+      sync
+      reboot -f
+    fi
+  ) </dev/null >/dev/null 2>&1 &
+fi
+
+# --- 5. switch_root ------------------------------------------------------------
+mount --bind "$ROOT" /newroot || rescue "bind mount $ROOT failed"
+for m in proc sys dev; do
+  mount --move "/$m" "/newroot/$m" || rescue "move /$m failed"
+done
+log "switch_root -> $INIT_CMD"
+echo "switch_root -> $INIT_CMD" >> "$LOGF" 2>/dev/null
+sync
+exec switch_root /newroot "$INIT_CMD"
+rescue "switch_root returned"

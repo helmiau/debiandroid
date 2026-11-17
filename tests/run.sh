@@ -7,13 +7,13 @@ cd "$ROOT_DIR"
 
 fail=0
 echo "== syntax check =="
-for f in scripts/*.sh scripts/lib/*.sh scripts/rootfs/*.sh installer/*.sh; do
+for f in scripts/*.sh scripts/lib/*.sh scripts/rootfs/*.sh scripts/initramfs/*.sh installer/*.sh; do
   [ -f "$f" ] || continue
   bash -n "$f" || { echo "FAIL syntax: $f"; fail=1; }
 done
 echo "== shellcheck =="
 if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck scripts/*.sh scripts/lib/*.sh scripts/rootfs/*.sh || fail=1
+  shellcheck scripts/*.sh scripts/lib/*.sh scripts/rootfs/*.sh scripts/initramfs/*.sh || fail=1
 else
   echo "shellcheck not installed; skipped"
 fi

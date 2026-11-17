@@ -36,11 +36,17 @@ if [ "$MODE" = "dedicated" ]; then
   confirm "Format $TARGET_DEV as ext4 and install?"
   run mkfs.ext4 -L debiandroid "$TARGET_DEV"
 fi
-run mkdir -p "$CACHE_DIR/mnt/$DEVICE"
-run mount "$TARGET_DEV" "$CACHE_DIR/mnt/$DEVICE"
-run zstd -d -c "$1" | tar -x -C "$CACHE_DIR/mnt/$DEVICE"
-run mkdir -p "$CACHE_DIR/mnt/$DEVICE/etc"
-run touch "$CACHE_DIR/mnt/$DEVICE$ROOT_MARKER"
+# Layout must match initramfs/init:
+#   dedicated  -> rootfs at the partition root (init mounts the "debiandroid" partition)
+#   dual-boot  -> rootfs at <userdata>/debian-server/rootfs
+MNT="$CACHE_DIR/mnt/$DEVICE"
+SUBDIR=""
+[ "$MODE" = dual-boot ] && SUBDIR=/debian-server/rootfs
+run mkdir -p "$MNT$SUBDIR"
+run mount "$TARGET_DEV" "$MNT"
+run zstd -d -c "$1" | tar -x -C "$MNT$SUBDIR"
+run mkdir -p "$MNT$SUBDIR/etc"
+run touch "$MNT$SUBDIR$ROOT_MARKER"
 run sync
 run umount "$CACHE_DIR/mnt/$DEVICE"
 info "rootfs installed on $TARGET_DEV ($MODE)"

@@ -19,6 +19,19 @@ flowchart TD
 ```
 
 Implication: no EFI stub, GRUB, or new firmware is required. A valid `boot.img` is enough.
+Two kernel sources are supported, selected by `KERNEL_FLAVOR` in `devices/<codename>.env`:
+
+| Flavor | Kernel | DTB | What changes | Risk |
+|---|---|---|---|---|
+| `mainline` (default) | built from `KERNEL_REPO` | built from source, appended to the kernel | everything | high: every artifact is unproven until a device boots it |
+| `stock-repack` | the vendor's, byte for byte | the vendor's, byte for byte | only the initramfs | low: the bootloader already accepts these bytes |
+
+`stock-repack` exists because a failed mainline attempt on santoni (2026-11-16) left the
+device in EDL. It is the same approach as a51-server-os: keep what the bootloader
+validates, replace what it does not look at. Xiaomi's published source does not always
+contain the device tree (`santoni-n-oss` has no `msm8937-santoni.dts`), so building a
+stock kernel from source is not a reliable substitute for the vendor image.
+
 
 ## 2. Kernel build pipeline
 
@@ -33,23 +46,37 @@ Implication: no EFI stub, GRUB, or new firmware is required. A valid `boot.img` 
 - mido: mainline MSM8953 (base DT since 5.18) or the postmarketOS `qcom-msm8953` kernel as a ready reference.
 
 ## 3. initramfs and rootfs
+`initramfs/init` is a POSIX shell script run by a static ARM64 busybox:
 
-The minimal initramfs contains:
-- storage modules (ufshcd / sdhci) and ext4
-- a script that reads the `root=` parameter from cmdline
-- loop device support for dual-boot mode
-- `switch_root` into the real rootfs
+1. mount `/proc`, `/sys`, `/dev`, `/dev/pts`;
+2. set `hung_task_panic = 0` (vendor kernels panic when a task blocks and Android's
+   daemons are gone);
+3. clear a stale `boot-recovery` message in `misc`, otherwise every reboot returns to
+   the recovery loop;
+4. bring up a USB gadget with `acm` and `ncm`, retrying for 25 s because the UDC may
+   only appear after the cable is detected; this is the rescue console;
+5. find the root filesystem: a partition named `debiandroid` (dedicated mode) or
+   `<userdata>/debian-server/rootfs` (dual-boot mode);
+6. in test mode, arm a dead-man timer of `DEADMAN_SECONDS` (default 300): if the system
+   does not write `/var/log/debiandroid/healthy-<boot_id>`, the device reboots;
+7. `switch_root` into the rootfs and exec `runit` (or `/sbin/init`).
 
-Rootfs backends:
-- `debian.sh`: `debootstrap --arch=arm64` plus base server packages (openssh-server, systemd-networkd).
+Build-time settings live in `/debiandroid.conf` inside the archive. Any failure drops to
+a shell on the USB serial console instead of hanging silently.
+
+`scripts/initramfs/build.sh <codename> --mode prod|test` assembles the archive with
+`scripts/lib/mkcpio.py` (a cpio newc writer in Python, so no `cpio` binary is needed on
+the host). Rootfs backends:
+
+- `debian.sh`: `debootstrap --arch=arm64` plus base server packages.
 - `ubuntu.sh`: `ubuntu-base` arm64 as the base.
-- `prebuilt.sh`: extract a ready image, add server packages.
+- `prebuilt.sh`: ready image plus server packages.
 
 ## 4. Installation modes
 
 | Mode | Mechanism | Risk |
 |---|---|---|
-| dual-boot | Loop file `rootfs.img` on the data partition; initramfs runs `losetup` | Android update can overwrite boot; limited space |
+| dual-boot | Directory `/data/debian-server/rootfs` on the data partition; no loop device is needed because Android is not running | Android update can overwrite boot; limited space |
 | dedicated | Dedicated ext4 partition, Android erased; kernel in the boot partition | Destructive, no return without a restore |
 
 ## 5. Networking

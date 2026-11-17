@@ -3,7 +3,10 @@
 # Shared helpers. Source this file; do not execute it.
 set -euo pipefail
 
-ROOT_DIR="${DEBIANDROID_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# ROOT_DIR always points at the real checkout, so helper scripts are found even
+# when DEBIANDROID_REPO_ROOT redirects device configuration to a test copy.
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+DEVICES_DIR="${DEBIANDROID_REPO_ROOT:-$ROOT_DIR}/devices"
 OUT_DIR="${DEBIANDROID_OUT:-$ROOT_DIR/out}"
 CACHE_DIR="${DEBIANDROID_CACHE:-$ROOT_DIR/.cache}"
 FASTBOOT_BIN="${FASTBOOT_BIN:-fastboot}"
@@ -50,24 +53,37 @@ parse_common_flags() {
 load_device() {
   local codename="${1:-}"
   [ -n "$codename" ] || usage_die "missing codename"
-  local file="$ROOT_DIR/devices/$codename.env"
+  local file="$DEVICES_DIR/$codename.env"
   if [ ! -f "$file" ]; then
     local available
-    available="$(cd "$ROOT_DIR/devices" && ls -1 *.env.example 2>/dev/null | sed 's/\.env\.example$//' | tr '\n' ' ')"
+    available="$(cd "$DEVICES_DIR" && ls -1 *.env.example 2>/dev/null | sed 's/\.env\.example$//' | tr '\n' ' ')"
     usage_die "unknown codename '$codename'. available: ${available:-none}"
   fi
   # shellcheck disable=SC1090
   . "$file"
+  # Two kernel sources:
+  #   mainline     build from KERNEL_REPO; every kernel key is required
+  #   stock-repack keep the vendor kernel and DTB, replace only the initramfs
+  KERNEL_FLAVOR="${KERNEL_FLAVOR:-mainline}"
+  case "$KERNEL_FLAVOR" in
+    mainline|stock-repack) ;;
+    *) die "$file: KERNEL_FLAVOR must be mainline or stock-repack (got $KERNEL_FLAVOR)" ;;
+  esac
   local key
-  for key in DEVICE SOC KERNEL_REPO KERNEL_REF DEFCONFIG DTB_NAME BOOTIMG_PAGESIZE \
-             BOOTIMG_BASE CMDLINE NET_MODE ROOT_PARTNAME_EXPECTED ROOT_MARKER MIN_FREE_GB; do
+  local -a needed=(DEVICE SOC ROOT_PARTNAME_EXPECTED ROOT_MARKER MIN_FREE_GB)
+  if [ "$KERNEL_FLAVOR" = mainline ]; then
+    needed+=(KERNEL_REPO KERNEL_REF DEFCONFIG DTB_NAME BOOTIMG_PAGESIZE BOOTIMG_BASE CMDLINE NET_MODE)
+  fi
+  for key in "${needed[@]}"; do
     [ -n "${!key:-}" ] || die "$file: missing required key $key"
   done
   [ "$DEVICE" = "$codename" ] || die "$file: DEVICE=$DEVICE does not match filename $codename"
-  case "$BOOTIMG_PAGESIZE" in 2048|4096) ;; *) die "$file: BOOTIMG_PAGESIZE must be 2048 or 4096" ;; esac
-  case "$NET_MODE" in wlan0|usb0|eth0) ;; *) die "$file: NET_MODE must be wlan0, usb0, or eth0" ;; esac
+  if [ "$KERNEL_FLAVOR" = mainline ]; then
+    case "$BOOTIMG_PAGESIZE" in 2048|4096) ;; *) die "$file: BOOTIMG_PAGESIZE must be 2048 or 4096" ;; esac
+    case "$NET_MODE" in wlan0|usb0|eth0) ;; *) die "$file: NET_MODE must be wlan0, usb0, or eth0" ;; esac
+  fi
   [ "${MIN_FREE_GB:-0}" -ge 1 ] 2>/dev/null || die "$file: MIN_FREE_GB must be a positive integer"
-  export DEVICE SOC KERNEL_REPO KERNEL_REF KERNEL_COMMIT KERNEL_ARCHIVE_SHA256 DEFCONFIG DTB_NAME DTB_VARIANT \
+  export DEVICE SOC KERNEL_FLAVOR KERNEL_REPO KERNEL_REF KERNEL_COMMIT KERNEL_ARCHIVE_SHA256 DEFCONFIG DTB_NAME DTB_VARIANT \
          BOOTIMG_PAGESIZE BOOTIMG_BASE CMDLINE NET_MODE ROOT_PARTNAME_EXPECTED ROOT_MARKER MIN_FREE_GB
 }
 

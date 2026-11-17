@@ -87,11 +87,16 @@ There is no application authentication. Access control is physical and operation
 | REQ-KRN-002 | Produce `Image.gz`, DTB, and checksums in `out/<codename>/` | P0 |
 | REQ-KRN-003 | Verify the recorded source commit and checksum before building | P0 |
 | REQ-BOOT-001 | Assemble `boot.img` with the correct page size, cmdline, and initramfs | P0 |
-| REQ-BOOT-002 | Non-destructive boot test via `fastboot boot` | P0 |
+| REQ-BOOT-002 | Test images on the recovery partition first; `fastboot boot` of an unproven image requires an explicit override | P0 |
+| REQ-BOOT-003 | `stock-repack` kernel flavor: keep the vendor kernel and DTB, replace only the initramfs | P0 |
+| REQ-BOOT-004 | Refuse to produce a boot image with no initramfs | P0 |
+| REQ-BOOT-005 | Verify a written partition by reading it back and comparing SHA-256 | P0 |
+| REQ-BOOT-006 | Save the stock boot and recovery images before any write | P0 |
+| REQ-BOOT-007 | Test-mode initramfs arms a dead-man timer and reboots instead of hanging | P1 |
 | REQ-ROOT-001 | Debian rootfs backend via debootstrap | P0 |
 | REQ-ROOT-002 | Ubuntu base rootfs backend | P1 |
 | REQ-ROOT-003 | Prebuilt image backend (postmarketOS) plus server packages | P1 |
-| REQ-INST-001 | Dual-boot mode: rootfs in a loop file on the data partition | P0 |
+| REQ-INST-001 | Dual-boot mode: rootfs in a directory on the data partition (`/data/debian-server/rootfs`), no loop device | P0 |
 | REQ-INST-002 | Dedicated mode: dedicated ext4 root partition | P1 |
 | REQ-INST-003 | TWRP zip installer: flashed from TWRP, equivalent to a custom ROM | P0 |
 | REQ-INST-004 | Verify partition identity (`PARTNAME`/UUID) and root marker before mount or mkfs | P0 |

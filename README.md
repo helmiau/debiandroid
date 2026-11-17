@@ -26,14 +26,24 @@ Mainline status: mido has the best networking support (WLAN/Bluetooth 6.4); sagi
 # 1. Prepare the device configuration
 cp devices/santoni.env.example devices/santoni.env
 
-# 2. Build kernel and boot image (make-bootimg.sh runs the structural validator)
+# 2. Save the stock boot and recovery images (the only reliable restore path)
+./scripts/backup-stock.sh santoni
+
+# 3. Build the initramfs (needs a static ARM64 busybox)
+./scripts/initramfs/build.sh santoni --mode test
+
+# 4a. Safe path: keep the vendor kernel, replace only the initramfs
+./scripts/repack-stock.sh santoni --stock-boot out/santoni/stock/boot-stock-santoni.img
+
+# 4b. Mainline path: build kernel and boot image (structural validator runs)
 ./scripts/build-kernel.sh santoni
 ./scripts/make-bootimg.sh santoni
 
-# 3. Test the boot without touching storage (RAM boot)
-./scripts/flash.sh santoni --ram-boot
+# 5. Test from the recovery partition, then prove the write by reading it back
+./scripts/flash.sh santoni --flash-recovery --image out/santoni/boot-santoni-stock-test.img
+./scripts/verify-flash.sh santoni recovery out/santoni/boot-santoni-stock-test.img
 
-# 4. Install the server rootfs (choose a backend)
+# 6. Install the server rootfs (choose a backend)
 ./scripts/rootfs/debian.sh santoni --mode dual-boot
 ./scripts/install.sh santoni --mode dual-boot
 ```
@@ -48,7 +58,7 @@ ssh debian@<device-ip>
 
 | Mode | Effect | Android safe |
 |---|---|---|
-| `dual-boot` | Rootfs in a loop file on the data partition; Android untouched | Yes |
+| `dual-boot` | Rootfs in `/data/debian-server/rootfs` on the data partition; Android untouched | Yes |
 | `dedicated` | Dedicated root partition; all storage used by the server | No (Android is erased) |
 
 ## Choose a rootfs backend
@@ -94,7 +104,7 @@ The `snapshot` channel is reproducible; `stable` uses the latest packages at rel
 ```bash
 ./scripts/build-kernel.sh <codename> [--clean]
 ./scripts/make-bootimg.sh <codename> [--verbose]   # run also verify-bootimg.py [--verbose]
-./scripts/flash.sh <codename> [--ram-boot|--flash-boot]
+./scripts/flash.sh <codename> [--ram-boot|--flash-boot|--flash-recovery] [--image FILE]
 ./scripts/rootfs/debian.sh <codename> [--mode dual-boot|dedicated] [--size 4G]
 ./scripts/install.sh <codename> --mode dual-boot|dedicated
 ./scripts/fetch.sh --backend debian|ubuntu|prebuilt --channel snapshot|stable --verify

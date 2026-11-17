@@ -81,17 +81,23 @@ setup() {
   mkdir -p "$DEBIANDROID_OUT/santoni"
   touch "$DEBIANDROID_OUT/santoni/boot-santoni.img"
   run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" \
-      "$REPO_ROOT/scripts/flash.sh" santoni --ram-boot --dry-run
+      "$REPO_ROOT/scripts/flash.sh" santoni --flash-recovery --dry-run
   [ "$status" -eq 0 ]
 }
-
-@test "flash dry-run fails clearly when the image is missing" {
+@test "flash refuses a RAM boot of an unproven image" {
+  mkdir -p "$DEBIANDROID_OUT/santoni"
+  touch "$DEBIANDROID_OUT/santoni/boot-santoni.img"
   run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" \
       "$REPO_ROOT/scripts/flash.sh" santoni --ram-boot --dry-run
   [ "$status" -eq 1 ]
+  [[ "$output" == *"--allow-unproven"* ]]
+}
+@test "flash dry-run fails clearly when the image is missing" {
+  run env DEBIANDROID_REPO_ROOT="$DEBIANDROID_REPO_ROOT" \
+      "$REPO_ROOT/scripts/flash.sh" santoni --flash-recovery --dry-run
+  [ "$status" -eq 1 ]
   [[ "$output" == *"boot image not built"* ]]
 }
-
 @test "santoni declares a kconfig fragment that exists" {
   run grep -E '^KCONFIG_FRAGMENT=kernel/config/santoni-server.config$' "$REPO_ROOT/devices/santoni.env.example"
   [ "$status" -eq 0 ]
