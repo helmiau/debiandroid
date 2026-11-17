@@ -25,6 +25,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE=""
 IMAGE=""
 ALLOW_UNPROVEN=0
+CONFIRM_YES=0
 ARGS=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -33,6 +34,7 @@ while [ "$#" -gt 0 ]; do
     --flash-recovery) MODE=recovery ;;
     --flash-lk2nd) MODE=lk2nd ;;
     --image) IMAGE="${2:-}"; shift ;;
+    --yes) CONFIRM_YES=1 ;;
     --allow-unproven) ALLOW_UNPROVEN=1 ;;
     --dry-run) DRY_RUN=1 ;;
     -*) usage_die "unknown option: $1" ;;
@@ -80,7 +82,11 @@ case "$MODE" in
     warn "This overwrites partition '$MODE' on $DEVICE."
     warn "A wrong image leaves the phone unbootable until a stock restore."
     warn "Keep the stock image at hand: scripts/backup-stock.sh $DEVICE"
-    confirm "Flash $(basename "$IMG") to the $MODE partition of $DEVICE?"
+    if [ "$CONFIRM_YES" = "1" ]; then
+      warn "flag --yes given, no interactive confirmation"
+    else
+      confirm "Flash $(basename "$IMG") to the $MODE partition of $DEVICE?"
+    fi
     run "$FASTBOOT_BIN" flash "$MODE" "$IMG"
     info "wrote $IMG to $MODE"
     info "verify after booting Android: scripts/verify-flash.sh $DEVICE $MODE $IMG"

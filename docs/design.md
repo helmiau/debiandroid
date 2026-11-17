@@ -99,8 +99,7 @@ release advertises an asset that is not built.
 
 ## 4b. Kiosk display (opt-in)
 With `KIOSK=0` (default) nothing is drawn on the panel: the device boots to a blank
-screen and is managed entirely over SSH through `usb0` or `wlan0`, or over UART when the
-network is down (santoni: TP29 TX, TP30 RX, 3.3 V TTL, FT232RL).
+screen and is managed entirely over SSH through `usb0` or `wlan0`.
 
 With `KIOSK=1`, `cage` (a single-window Wayland compositor over DRM/KMS) and
 `epiphany-browser` are added to the image and `debiandroid-kiosk.service` is enabled.

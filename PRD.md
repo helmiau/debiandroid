@@ -13,7 +13,7 @@ debiandroid is a tooling repository (scripts and documentation) for installing a
 
 Intended use: pocket servers (SSH access, server packages, light containers). Not a desktop, not a daily-driver phone.
 
-The panel is optional. With `KIOSK=0` (default) nothing draws to it; the device boots to a blank screen and is managed entirely over SSH through `usb0` or `wlan0`, or over UART when the network is down. With `KIOSK=1`, `cage` + `epiphany-browser` shows one configured page fullscreen, OpenWrt style.
+The panel is optional. With `KIOSK=0` (default) nothing draws to it; the device boots to a blank screen and is managed entirely over SSH through `usb0` or `wlan0`. With `KIOSK=1`, `cage` + `epiphany-browser` shows one configured page fullscreen, OpenWrt style.
 
 ## 2. Problem
 
