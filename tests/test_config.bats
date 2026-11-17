@@ -178,3 +178,42 @@ assert len(d)%2048==0
   run grep -q "require_fastboot" "$REPO_ROOT/scripts/lib/preflight.sh"
   [ "$status" -eq 0 ]
 }
+
+@test "verify-bootimg rejects an image with no ramdisk" {
+  local tmp="$BATS_TEST_TMPDIR/vb"; mkdir -p "$tmp"
+  local wtmp; wtmp="$(cd "$tmp" && pwd -W 2>/dev/null || echo "$tmp")"
+  "$PY" -c "open(r'$wtmp/k.gz','wb').write(bytes(4096))"
+  run "$PY" "$REPO_ROOT/scripts/lib/mkbootimg.py" --kernel "$wtmp/k.gz" \
+      --pagesize 2048 --cmdline "console=ttyMSM0" --output "$wtmp/b.img"
+  [ "$status" -eq 0 ]
+  run "$PY" "$REPO_ROOT/scripts/lib/verify-bootimg.py" "$wtmp/b.img"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"ramdisk_size is 0"* ]]
+}
+
+@test "verify-bootimg accepts an image with an initramfs" {
+  local tmp="$BATS_TEST_TMPDIR/vb2"; mkdir -p "$tmp"
+  local wtmp; wtmp="$(cd "$tmp" && pwd -W 2>/dev/null || echo "$tmp")"
+  "$PY" -c "import gzip; open(r'$wtmp/k.gz','wb').write(gzip.compress(bytes(256)))"
+  "$PY" -c "import gzip; open(r'$wtmp/r.cpio.gz','wb').write(gzip.compress(b'070701'*10))"
+  run "$PY" "$REPO_ROOT/scripts/lib/mkbootimg.py" --kernel "$wtmp/k.gz" \
+      --ramdisk "$wtmp/r.cpio.gz" --pagesize 2048 --cmdline "console=ttyMSM0" \
+      --output "$wtmp/b.img"
+  [ "$status" -eq 0 ]
+  run "$PY" "$REPO_ROOT/scripts/lib/verify-bootimg.py" "$wtmp/b.img"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"OK"* ]]
+}
+
+@test "make-bootimg refuses to build without an initramfs" {
+  local tmp="$BATS_TEST_TMPDIR/mb"; mkdir -p "$tmp/repo/devices" "$tmp/out/santoni"
+  local wtmp; wtmp="$(cd "$tmp" && pwd -W 2>/dev/null || echo "$tmp")"
+  cp "$REPO_ROOT/devices/santoni.env.example" "$tmp/repo/devices/santoni.env.example"
+  cp "$REPO_ROOT/devices/santoni.env.example" "$tmp/repo/devices/santoni.env"
+  "$PY" -c "open(r'$wtmp/out/santoni/Image.gz','wb').write(bytes(4096))"
+  "$PY" -c "open(r'$wtmp/out/santoni/msm8940-xiaomi-santoni.dtb','wb').write(bytes(64))"
+  run env DEBIANDROID_REPO_ROOT="$tmp/repo" DEBIANDROID_OUT="$tmp/out" \
+      "$REPO_ROOT/scripts/make-bootimg.sh" santoni
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no initramfs"* ]]
+}
