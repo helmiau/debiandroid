@@ -170,5 +170,6 @@ Bootloader Interface missing" case: [docs/troubleshooting.md](docs/troubleshooti
 | `docs/troubleshooting.md` | Recovery mode, fastboot, and Windows driver fixes |
 | `docs/a51-comparison.md` | Cross-project analysis of a51-server-os and the changes it implies |
 | `docs/klipperphones-comparison.md` | KlipperPhonesLinux: lk2nd + mainline on mido/santoni, reusable configs, and its gaps |
+| `docs/docker-on-android-comparison.md` | Container kernel prerequisites, and which Android workarounds we do not need |
 | `AGENTS.md` | Working rules for coding agents |
 | `LICENSES/README.md` | License map per directory |

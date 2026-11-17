@@ -154,7 +154,9 @@ Authoring host: Windows 10, Git bash, Python 3.14, shellcheck 0.10.0. No device 
 | flash target guard | `flash.sh <dev> --ram-boot --dry-run` | PASS (exit 1, refuses without `--allow-unproven`) |
 | flash recovery dry-run | `flash.sh <dev> --flash-recovery --dry-run` | PASS |
 | shellcheck, new scripts | `shellcheck -x` on LF copies | PASS for the new files; SC1091/SC2034 findings are pre-existing |
-| bats suite | `bats tests/test_config.bats tests/test_boot_chain.bats` | PASS 34/34 (27 config + 7 boot chain) |
+| bats suite | `bats tests/test_config.bats tests/test_boot_chain.bats` | PASS 37/37 (27 config + 10 boot chain) |
+| fragment merge | `build-kernel.sh probe --dry-run` with `KCONFIG_FRAGMENT_EXTRA` | PASS: both fragments merged in order, then `olddefconfig` |
+| fragment verification | `kconfig-check.sh` on a merged config | PASS: missing symbol and y-to-m downgrade both rejected with exit 3 |
 
 Note: local runs need `PATH` pointed at a real bash; on Windows the `bash` on PATH is the WSL
 launcher. CI does not run the suite, so this was executed manually.

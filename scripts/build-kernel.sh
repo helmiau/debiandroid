@@ -55,17 +55,33 @@ fi
 require_cmd make aarch64-linux-gnu-gcc
 [ "$CLEAN" = "1" ] && run make -C "$SRC" O="$KDIR" ARCH=arm64 mrproper
 
-# 2. Configure.
+# 2. Configure. The per-device fragment is applied first, then any extras
+# (KCONFIG_FRAGMENT_EXTRA, comma or space separated), so a shared fragment such
+# as kernel/config/containers.config can add features on top.
 run cp "$SRC/arch/arm64/configs/$DEFCONFIG" "$KDIR/.config"
+FRAGMENTS=()
 if [ -n "${KCONFIG_FRAGMENT:-}" ]; then
-  FRAG="$ROOT_DIR/$KCONFIG_FRAGMENT"
-  [ -f "$FRAG" ] || die "KCONFIG_FRAGMENT not found: $FRAG"
+  FRAGMENTS+=("$ROOT_DIR/$KCONFIG_FRAGMENT")
+fi
+if [ -n "${KCONFIG_FRAGMENT_EXTRA:-}" ]; then
+  for extra in ${KCONFIG_FRAGMENT_EXTRA//,/ }; do
+    FRAGMENTS+=("$ROOT_DIR/$extra")
+  done
+fi
+for FRAG in ${FRAGMENTS[@]+"${FRAGMENTS[@]}"}; do
+  [ -f "$FRAG" ] || die "kernel config fragment not found: $FRAG"
   if [ "$DRY_RUN" = "1" ]; then
     log "[dry-run] scripts/kconfig/merge_config.sh -m $KDIR/.config $FRAG"
   else
     "$SRC/scripts/kconfig/merge_config.sh" -m -O "$KDIR" "$KDIR/.config" "$FRAG" >/dev/null
-    info "merged fragment $KCONFIG_FRAGMENT"
+    info "merged fragment ${FRAG#"$ROOT_DIR/"}"
   fi
+done
+# Kconfig drops an option when the symbol does not exist or dependencies are
+# unmet, and merge_config.sh only warns. Fail now instead of after the compile.
+if [ "$DRY_RUN" != "1" ] && [ "${#FRAGMENTS[@]}" -gt 0 ]; then
+  "$ROOT_DIR/scripts/lib/kconfig-check.sh" "$KDIR/.config" "${FRAGMENTS[@]}" \
+    || die "configure: fragment options did not survive the merge (see above)"
 fi
 run make -C "$SRC" O="$KDIR" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
 

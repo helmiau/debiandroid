@@ -105,3 +105,26 @@ PYEOF
   [ "$status" -eq 0 ]
   [[ "$output" == *"initramfs-santoni-test.cpio.gz"* ]]
 }
+
+@test "kconfig-check accepts a fragment that survived the merge" {
+  printf 'CONFIG_CGROUP_DEVICE=y\nCONFIG_VETH=m\n# a comment\nCONFIG_SOMETHING=n\n' > "$BATS_TEST_TMPDIR/frag"
+  printf 'CONFIG_CGROUP_DEVICE=y\nCONFIG_VETH=m\n' > "$BATS_TEST_TMPDIR/merged"
+  run "$REPO_ROOT/scripts/lib/kconfig-check.sh" "$BATS_TEST_TMPDIR/merged" "$BATS_TEST_TMPDIR/frag"
+  [ "$status" -eq 0 ]
+}
+
+@test "kconfig-check names an option the tree dropped" {
+  printf 'CONFIG_CGROUP_DEVICE=y\nCONFIG_NO_SUCH_SYMBOL=y\n' > "$BATS_TEST_TMPDIR/frag"
+  printf 'CONFIG_CGROUP_DEVICE=y\n' > "$BATS_TEST_TMPDIR/merged"
+  run "$REPO_ROOT/scripts/lib/kconfig-check.sh" "$BATS_TEST_TMPDIR/merged" "$BATS_TEST_TMPDIR/frag"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"CONFIG_NO_SUCH_SYMBOL"* ]]
+}
+
+@test "kconfig-check reports a value downgraded to module" {
+  printf 'CONFIG_OVERLAY_FS=y\n' > "$BATS_TEST_TMPDIR/frag"
+  printf 'CONFIG_OVERLAY_FS=m\n' > "$BATS_TEST_TMPDIR/merged"
+  run "$REPO_ROOT/scripts/lib/kconfig-check.sh" "$BATS_TEST_TMPDIR/merged" "$BATS_TEST_TMPDIR/frag"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"requested CONFIG_OVERLAY_FS=y"* ]]
+}

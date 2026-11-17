@@ -48,6 +48,13 @@ stock kernel from source is not a reliable substitute for the vendor image.
 3. Assemble `boot.img` with `mkbootimg`: page size (4096 for UFS, 2048 for eMMC), cmdline, initramfs.
 4. Store artifacts in `out/<codename>/` together with checksums.
 
+**Container prerequisites.** `kernel/config/containers.config` is merged after the
+per-device fragment (`KCONFIG_FRAGMENT_EXTRA`) and enables namespaces, cgroups
+(`PIDS`, `DEVICE`, `FREEZER`, `MEMCG`), `OVERLAY_FS`, `VETH`, `BRIDGE` and NAT.
+`scripts/lib/kconfig-check.sh` then proves the options survived the merge; Kconfig drops
+a symbol whose dependencies are unmet and `merge_config.sh` only warns. The
+`stock-repack` flavor cannot run containers: vendor kernels lack the cgroup controllers.
+
 **Sources used**
 - santoni: `MrArtemSid/linux-msm89x7` branch `santoni`, pinned to `f47205ee`. Provides `msm8940-xiaomi-santoni.dts` and `santoni_openwrt_defconfig`. MSM8940 is the Redmi 4X variant of MSM8937. Out-of-tree panel drivers exist in `drm/panel/msm89x7-generated/` (`panel-xiaomi-santoni-hx8394f-boe`, `-ili9881c-ebbg`, `-ili9881c-ebbgdjn`); identify your panel before enabling one.
 - sagit: the MSM8998 community fork that explicitly supports the Xiaomi Mi6.

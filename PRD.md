@@ -93,6 +93,7 @@ There is no application authentication. Access control is physical and operation
 | REQ-BOOT-005 | Verify a written partition by reading it back and comparing SHA-256 | P0 |
 | REQ-BOOT-006 | Save the stock boot and recovery images before any write | P0 |
 | REQ-BOOT-007 | Test-mode initramfs arms a dead-man timer and reboots instead of hanging | P1 |
+| REQ-SRV-001 | Mainline kernels enable the container prerequisites (namespaces, cgroups, overlayfs, veth, NAT); verified after the fragment merge | P1 |
 | REQ-ROOT-001 | Debian rootfs backend via debootstrap | P0 |
 | REQ-ROOT-002 | Ubuntu base rootfs backend | P1 |
 | REQ-ROOT-003 | Prebuilt image backend (postmarketOS) plus server packages | P1 |
