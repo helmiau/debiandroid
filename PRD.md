@@ -11,7 +11,9 @@ debiandroid is a tooling repository (scripts and documentation) for installing a
 - **Redmi Note 4X (mido)**: Snapdragon 625 (MSM8953), eMMC (embedded MultiMediaCard) 32/64 GB, RAM 3/4 GB.
 - **Redmi 4X (santoni)**: Snapdragon 435 (MSM8937), eMMC 16/32 GB, RAM 2/3 GB.
 
-Intended use: pocket servers (SSH access, server packages, light containers) and appliance panels: the phone screen shows one fullscreen web page, OpenWrt style. Not a desktop, not a daily-driver phone.
+Intended use: pocket servers (SSH access, server packages, light containers). Not a desktop, not a daily-driver phone.
+
+The panel is optional. With `KIOSK=0` (default) nothing draws to it; the device boots to a blank screen and is managed entirely over SSH through `usb0` or `wlan0`, or over UART when the network is down. With `KIOSK=1`, `cage` + `epiphany-browser` shows one configured page fullscreen, OpenWrt style.
 
 ## 2. Problem
 
@@ -49,7 +51,7 @@ Intended use: pocket servers (SSH access, server packages, light containers) and
 - `stock-repack` path: keep the vendor kernel and DTB byte for byte and replace only the initramfs. This is the first hardware milestone. Mainline follows on msm8953/msm8940 behind a second-stage bootloader (lk2nd), which has no msm8998 target.
 - Rootfs backend: Debian (debootstrap). Ubuntu and prebuilt images are deferred; the release pipeline ships Debian only.
 - Two bootloaders: stock aboot, or lk2nd for mainline on msm8953/msm8940. lk2nd is taken from a pinned upstream release, not built here.
-- Optional kiosk browser (`KIOSK=1`): cage plus Epiphany showing one URL on the panel.
+- Optional kiosk browser (`KIOSK=1`, off by default): cage plus Epiphany showing one configurable URL on the panel.
 - Installation modes: dual-boot and dedicated.
 - TWRP (Team Win Recovery Project) zip installer, equivalent to flashing a custom ROM, plus a fastboot path.
 - GitHub Actions CI on `v*` tags: `boot.img`, rootfs per channel, `SHA256SUMS`, installer zip.
@@ -189,7 +191,7 @@ BOOTLOADER=aboot|lk2nd                 # lk2nd required for mainline on msm8953/
 LK2ND_TARGET=                          # msm8952 for santoni, msm8953 for mido
 LK2ND_URL=                             # pinned upstream release asset
 LK2ND_SHA256=                          # 64 hex characters, checked before flashing
-KIOSK=0|1                              # 1 = fullscreen browser on the panel
+KIOSK=0|1                              # 1 = fullscreen browser on the panel (opt-in, default 0)
 KERNEL_REPO=
 KERNEL_REF=
 KERNEL_COMMIT=
@@ -261,13 +263,13 @@ P0 verification matrix:
 |---|---|
 | REQ-KRN-001 | kernel artifact exists, checksum matches |
 | REQ-BOOT-002/003 | boot log appears, initramfs runs, the vendor kernel is unchanged |
-| REQ-INST-001 | `findmnt /` points at `/data/debian-server/rootfs`, no loop device |
+| REQ-INST-001 | `findmnt /` points at `/data/debian-server/rootfs`, no loop device | One rootfs image can serve multiple devices; only kernel, DTB and initramfs are device-specific.
 | REQ-INST-003 | zip flashes in TWRP, reboot, SSH works |
 | REQ-KRN-003 | wrong commit or checksum aborts before compile |
 | REQ-INST-004 | wrong PARTNAME or missing marker aborts before mount |
 | REQ-BOOT-005 | `verify-flash.sh` matches the image SHA-256 after a write |
 | REQ-BOOT-008 | `fetch-lk2nd.sh` verifies SHA-256; `flash.sh --flash-lk2nd` refuses a mismatched image |
-| REQ-UI-001 | kiosk unit active, the panel shows the configured URL |
+| REQ-UI-001 | kiosk unit active, the panel shows the configured URL (`KIOSK=1` opt-in; default off) |
 | REQ-NET-001 | `ip -br a` shows `wlan0` with an IP |
 | REQ-NET-002 | `ip -br a` shows `usb0` with an IP |
 | REQ-NET-003 | `ip -br a` shows `usb0` or `wlan0` with an IP on santoni |

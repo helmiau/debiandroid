@@ -37,7 +37,8 @@ Read `PRD.md` and `docs/design.md` before touching code. Those documents are the
 - `scripts/install.sh`: installation orchestration for the selected `--mode`.
 - `scripts/flash.sh`: flash `lk2nd`, `boot` or `recovery`, with confirmation and a RAM-boot override.
 - `scripts/fetch-lk2nd.sh`: download the pinned lk2nd release image and verify its SHA-256.
-- `rootfs/overlay/etc/systemd/system/debiandroid-kiosk.service`: opt-in fullscreen browser (`KIOSK=1`).
+- `rootfs/overlay/etc/systemd/system/debiandroid-kiosk.service`: opt-in fullscreen browser (`KIOSK=1`, default off).
+- One rootfs image serves multiple devices; kernel, DTB and initramfs remain device-specific.
 - `scripts/verify-flash.sh`: read the partition back through adb and compare SHA-256.
 - `scripts/backup-stock.sh`: save the stock boot and recovery images before any write.
 

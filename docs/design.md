@@ -97,13 +97,17 @@ release advertises an asset that is not built.
 | dual-boot | Directory `/data/debian-server/rootfs` on the data partition; no loop device is needed because Android is not running | Android update can overwrite boot; limited space |
 | dedicated | Dedicated ext4 partition, Android erased; kernel in the boot partition | Destructive, no return without a restore |
 
-## 4b. Kiosk display
-`KIOSK=1` adds `cage` (a single-window Wayland compositor over DRM/KMS) and
-`epiphany-browser` to the image and enables `debiandroid-kiosk.service`. The unit reads
-`KIOSK_URL` from `/etc/debiandroid/kiosk.conf`, default `http://127.0.0.1:8080/`, so the
-device behaves like an OpenWrt panel: boot, then show one page. Adreno is driven by
-freedreno in the mainline kernel; no proprietary userspace is involved. The unit runs as
-root until a dedicated account is provisioned, and it is off unless `KIOSK=1`.
+## 4b. Kiosk display (opt-in)
+With `KIOSK=0` (default) nothing is drawn on the panel: the device boots to a blank
+screen and is managed entirely over SSH through `usb0` or `wlan0`, or over UART when the
+network is down (santoni: TP29 TX, TP30 RX, 3.3 V TTL, FT232RL).
+
+With `KIOSK=1`, `cage` (a single-window Wayland compositor over DRM/KMS) and
+`epiphany-browser` are added to the image and `debiandroid-kiosk.service` is enabled.
+The unit reads `KIOSK_URL` from `/etc/debiandroid/kiosk.conf`, default
+`http://127.0.0.1:8080/`, so the device behaves like an OpenWrt panel: boot, then show
+one page. Adreno is driven by freedreno in the mainline kernel; no proprietary userspace
+is involved. The unit runs as root until a dedicated account is provisioned.
 
 ## 5. Networking
 

@@ -64,6 +64,13 @@ ssh debian@<device-ip>
 | `dual-boot` | Rootfs in `/data/debian-server/rootfs` on the data partition; Android untouched | Yes |
 | `dedicated` | Dedicated root partition; all storage used by the server | No (Android is erased) |
 
+## Multiple devices from one rootfs
+
+The rootfs image is generic: `install.sh` extracts it into
+`/data/debian-server/rootfs` on any device. Only the kernel, DTB and initramfs are
+device-specific (`devices/<codename>.env` picks `KERNEL_FLAVOR`, `DTB_NAME` and
+`BOOTLOADER`). One Debian image can therefore serve santoni, mido and sagit alike.
+
 ## Choose a rootfs backend
 
 ```bash
