@@ -38,7 +38,7 @@ Record device, firmware, panel variant, commit, and image hash for each run.
 |---|---|---|
 | Non-destructive boot | `fastboot boot boot-<codename>.img` | Kernel log appears, initramfs reaches network stage |
 | Partition guard | run installer with a deliberately wrong `ROOT_PARTNAME_EXPECTED` | Aborts before any write |
-| Dual-boot install | TWRP zip or `install.sh --mode dual-boot` | `findmnt /` shows a loop device, SSH reachable |
+| Dual-boot install | TWRP zip or `install.sh --mode dual-boot` | `findmnt /` points at `/data/debian-server/rootfs`, SSH reachable |
 | Dedicated install | `install.sh --mode dedicated` | `findmnt /` shows the real partition, SSH reachable |
 | Network (mido) | `ip -br a`, `ping` | `wlan0` has an IP and reaches the gateway |
 | Network (sagit) | `ip -br a`, `ping` | `usb0` has an IP and reaches the gateway |

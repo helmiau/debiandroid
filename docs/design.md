@@ -163,9 +163,9 @@ Zip layout and `update-binary` logic are specified in PRD section 20. Architectu
 
 - `update-binary` is POSIX shell, not Bash, so it is safe inside TWRP.
 - Device detection: read `ro.product.device` and match it against `config/device.env`.
-- `dual-boot`: loop file at `/data/debiandroid/rootfs.img`; the initramfs uses `losetup`.
-- `dedicated`: `mkfs.ext4` on the target partition, then write `boot-<codename>.img`.
-- Idempotent: if a valid `rootfs.img` already exists, update its contents instead of recreating it.
+- `dual-boot`: extract into `/data/debian-server/rootfs`; the initramfs mounts userdata (f2fs or ext4) and uses that directory directly. No loop device, because Android is not running to hold `/data`.
+- `dedicated`: `mkfs.ext4` on the partition named `debiandroid`, then write `boot-<codename>.img`; the initramfs mounts that partition as the root.
+- Idempotent: extracting over an existing rootfs updates it instead of recreating it.
 
 TWRP risks:
 - Older TWRP cannot decrypt `/data` (blocks dual-boot).

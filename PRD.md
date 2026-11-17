@@ -46,6 +46,7 @@ Intended use: pocket servers (SSH access, server packages, light containers). No
 **In scope**
 - Kernel and boot image support for santoni, mido, and sagit.
 - Build mainline/community kernels; assemble `boot.img` (kernel + DTB (Device Tree Blob) + initramfs).
+- `stock-repack` path: keep the vendor kernel and DTB byte for byte and replace only the initramfs. This is the first hardware milestone. Mainline follows on msm8953/msm8940 behind a second-stage bootloader (lk2nd), which has no msm8998 target.
 - Rootfs backends: Debian (debootstrap), Ubuntu (ubuntu-base), prebuilt image (postmarketOS).
 - Installation modes: dual-boot and dedicated.
 - TWRP (Team Win Recovery Project) zip installer, equivalent to flashing a custom ROM, plus a fastboot path.
@@ -116,8 +117,11 @@ There is no application authentication. Access control is physical and operation
 
 | Requirement | Implementation | Verification |
 |---|---|---|
-| REQ-KRN-001/002 | `scripts/build-kernel.sh` | artifact check in `out/`, `fastboot boot` test |
-| REQ-BOOT-001/002 | `scripts/make-bootimg.sh`, `scripts/flash.sh` | boot log via screen/USB, `--dry-run` |
+| REQ-KRN-001/002 | `scripts/build-kernel.sh`, `scripts/lib/kconfig-check.sh` | artifact check in `out/`, fragment options present after the merge |
+| REQ-BOOT-001/002 | `scripts/make-bootimg.sh`, `scripts/flash.sh` | boot log via screen/USB, `--dry-run`, refusal of `--ram-boot` without `--allow-unproven` |
+| REQ-BOOT-003/004 | `scripts/repack-stock.sh`, `scripts/lib/bootimg_v0.py` | byte-identical round trip; `verify-bootimg.py` rejects a missing ramdisk |
+| REQ-BOOT-005/006 | `scripts/verify-flash.sh`, `scripts/backup-stock.sh` | partition SHA-256 compared after write; stock image saved before any write |
+| REQ-BOOT-007 | `initramfs/init`, `rootfs/overlay/etc/systemd/system/debiandroid-health.service` | the test-mode timer is satisfied only by the health stamp |
 | REQ-ROOT-001/002/003 | `scripts/rootfs/*.sh` | chroot mount, package check, SSH login |
 | REQ-INST-001/002 | `scripts/install.sh` | reboot, `/proc/cmdline`, `df -h /` |
 | REQ-KRN-003 | `scripts/build-kernel.sh` preflight, `devices/*.env` | negative test: wrong commit or checksum aborts build |
@@ -134,15 +138,17 @@ There is no application authentication. Access control is physical and operation
 ```text
 Operator boots the device into fastboot
 |-> preflight: detect device, check unlock, check capacity
-|-> build kernel + boot.img
-|-> fastboot boot (temporary test, no storage writes)
+|-> backup the stock boot and recovery partitions first
+|-> build the initramfs, then either repack the stock image or build the mainline one
+|-> flash the recovery partition (test image), never the boot partition on the first attempt
+|-> read the partition back and compare SHA-256
 |-> choose rootfs backend and installation mode
 |-> install rootfs
-|-> reboot
+|-> reboot into the test image; the dead-man timer reverts to Android if nothing reports healthy
 |-> verify: initramfs -> rootfs -> network -> SSH
 ```
 
-Failure path: preflight fails -> stop before any destructive step; boot fails -> return to Android (the old boot image is untouched during RAM boot).
+Failure path: preflight fails -> stop before any destructive step; the test image fails -> the dead-man timer reboots to Android, and the images saved in step 1 are the restore source.
 
 ## 12. Architecture Summary
 
@@ -173,11 +179,14 @@ No database. Configuration is text files.
 `devices/<codename>.env`:
 
 ```text
+KERNEL_FLAVOR=mainline|stock-repack   # stock-repack builds no kernel at all
 KERNEL_REPO=
 KERNEL_REF=
 KERNEL_COMMIT=
 KERNEL_ARCHIVE_SHA256=
 DEFCONFIG=
+KCONFIG_FRAGMENT=          # per-device fragment
+KCONFIG_FRAGMENT_EXTRA=    # optional shared fragments, merged after it
 DTB_NAME=
 DTB_VARIANT=
 CMDLINE=
@@ -234,18 +243,19 @@ Real `.env` files are never committed; examples ship as `.env.example`.
 | Static | `shellcheck` across all scripts |
 | Unit | `bats` for argument parsing, `--dry-run`, `.env` resolution |
 | Host integration | kernel build and `boot.img` assembly produce valid artifacts |
-| On-device | `fastboot boot` plus `dmesg`, `ip a`, `ssh` checks |
+| On-device | recovery-partition flash, read-back comparison, `dmesg`, `ip a`, `ssh` checks |
 
 P0 verification matrix:
 
 | Requirement | Proof |
 |---|---|
 | REQ-KRN-001 | kernel artifact exists, checksum matches |
-| REQ-BOOT-002 | boot log appears, initramfs runs |
-| REQ-INST-001 | `findmnt /` points to a loop device |
+| REQ-BOOT-002/003 | boot log appears, initramfs runs, the vendor kernel is unchanged |
+| REQ-INST-001 | `findmnt /` points at `/data/debian-server/rootfs`, no loop device |
 | REQ-INST-003 | zip flashes in TWRP, reboot, SSH works |
 | REQ-KRN-003 | wrong commit or checksum aborts before compile |
 | REQ-INST-004 | wrong PARTNAME or missing marker aborts before mount |
+| REQ-BOOT-005 | `verify-flash.sh` matches the image SHA-256 after a write |
 | REQ-NET-001 | `ip -br a` shows `wlan0` with an IP |
 | REQ-NET-002 | `ip -br a` shows `usb0` with an IP |
 | REQ-NET-003 | `ip -br a` shows `usb0` or `wlan0` with an IP on santoni |
@@ -271,7 +281,7 @@ config/device.env
 
 1. Read `config/device.env`, match the device codename, reject on mismatch.
 2. Ask for the mode: `dual-boot` or `dedicated` (volume keys, shown on the TWRP screen).
-3. `dual-boot`: create `rootfs.img` under `/data/debiandroid/`, `losetup`, `mkfs.ext4`, extract.
+3. `dual-boot`: extract the tarball into `/data/debian-server/rootfs` (plain directory, no loop device), then write `boot-<codename>.img` with the initramfs.
 4. `dedicated`: `mkfs.ext4` the target partition, extract, write `boot-<codename>.img`.
 5. Verify payload checksums before extracting.
 6. Never touch any partition when verification fails.
@@ -343,7 +353,7 @@ FASTBOOT_BIN=fastboot
 
 ## 24. Acceptance Criteria and Definition of Done
 
-- santoni, mido, and sagit boot a mainline kernel from a script-built `boot.img`.
+- santoni boots the vendor kernel with the debiandroid initramfs (`stock-repack`); then mido and santoni boot mainline behind lk2nd; sagit follows once its boot path is settled.
 - Debian/Ubuntu server installs and is reachable over SSH with no desktop.
 - Dual-boot preserves Android; dedicated mode works and is verified.
 - The TWRP zip installer installs from TWRP without a Linux host, in both modes.
