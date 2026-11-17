@@ -77,6 +77,31 @@ jobs:
       - name: Verify kernel pin
         run: ./scripts/lib/kernel-pin.sh "${{ matrix.codename }}"
 
+      - name: Download busybox for the initramfs
+        run: |
+          # Alpine's busybox-static aarch64: a single static binary, ~1.1 MB.
+          curl -fsSL -o busybox.apk \
+            "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/busybox-static-1.36.1-r31.apk"
+          python3 - <<'EOF'
+          import gzip, pathlib, struct
+          raw = gzip.decompress(pathlib.Path("busybox.apk").read_bytes())
+          i = raw.find(b"\x7fELF")
+          e_shoff = struct.unpack_from("<Q", raw, i + 0x28)[0]
+          e_shentsize = struct.unpack_from("<H", raw, i + 0x3A)[0]
+          e_shnum = struct.unpack_from("<H", raw, i + 0x3C)[0]
+          size = e_shoff + e_shentsize * e_shnum
+          pathlib.Path("busybox-aarch64").write_bytes(raw[i:i+size])
+          print(f"busybox: {size} bytes")
+          EOF
+          mkdir -p "$DEBIANDROID_CACHE"
+          mv busybox-aarch64 "$DEBIANDROID_CACHE/busybox-aarch64"
+
+      - name: Build the initramfs
+        run: |
+          PYTHON=python3 ./scripts/initramfs/build.sh "${{ matrix.codename }}" \
+            --busybox "$DEBIANDROID_CACHE/busybox-aarch64" --mode test \
+            --out "$DEBIANDROID_OUT/${{ matrix.codename }}/initramfs.cpio.gz"
+
       - name: Build kernel and boot image
         run: |
           ./scripts/build-kernel.sh "${{ matrix.codename }}"
