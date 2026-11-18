@@ -1,0 +1,34 @@
+name: build-dropbear
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-aarch64-linux-gnu musl-tools dropbear
+      - name: Build static dropbear
+        run: |
+          D=$(mktemp -d)
+          curl -fsSL -o "$D/db.tar.bz2" \
+            "https://matt.ucc.asn.au/dropbear/releases/dropbear-2024.85.tar.bz2"
+          tar -xjf "$D/db.tar.bz2" -C "$D" --strip-components=1
+          cd "$D"
+          CC=aarch64-linux-musl-gcc make PROGRAMS="dropbear dropbearkey" STATIC=1 -j"$(nproc)"
+          file dropbear dropbearkey
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp dropbear dropbearkey "$GITHUB_WORKSPACE/out/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dropbear-static-aarch64
+          path: out/dropbear*
+          retention-days: 30
