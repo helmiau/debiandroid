@@ -15,7 +15,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            gcc-aarch64-linux-gnu musl-tools dropbear
+            gcc-aarch64-linux-gnu dropbear
       - name: Build static dropbear
         run: |
           D=$(mktemp -d)
@@ -23,8 +23,10 @@ jobs:
             "https://matt.ucc.asn.au/dropbear/releases/dropbear-2024.85.tar.bz2"
           tar -xjf "$D/db.tar.bz2" -C "$D" --strip-components=1
           cd "$D"
-          CC=aarch64-linux-musl-gcc ./configure --host=aarch64-linux-musl --disable-zlib
-          make PROGRAMS="dropbear dropbearkey" STATIC=1 -j"$(nproc)"
+          CC=aarch64-linux-gnu-gcc ./configure --host=aarch64-linux-gnu \
+            --disable-zlib
+          make PROGRAMS="dropbear dropbearkey" STATIC=1 \
+            LDFLAGS="-static" -j"$(nproc)"
           file dropbear dropbearkey
           mkdir -p "$GITHUB_WORKSPACE/out"
           cp dropbear dropbearkey "$GITHUB_WORKSPACE/out/"
